@@ -1,0 +1,14 @@
+{
+  "name": "udp-discovery",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "discover clients on the same network using udp broadcast/multicast",
+  "main": "index.js",
+  "author": "ABakdi",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "broadcast-address": "^1.0.2",
+    "uuid": "^8.3.2"
+  }
+}
