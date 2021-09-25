@@ -19,7 +19,7 @@ class Client{
         this.Servers = new PeersManager()
         this.visible = visible
         this.onTcpDataCallback = undefined
-        this.onEndCallback = undefined
+        this.onTcpEndCallback = undefined
         this.onTcpErrorCallback = undefined
         this.name = name
         this.id = uuidv4()
@@ -39,7 +39,7 @@ class Client{
         })
     }
 
-    descoveryHandler(message,remote){
+    discoveryHandler(message,remote){
         // chack if we already encountered this remote server befor
         // if yes then it must be stored in 'founPeers' list
         // we can get it using 'getClient' Method
@@ -72,8 +72,8 @@ class Client{
                 // if the remote peer is new
                 // add it to the list of Peers
                 this.foundPeers.push(remote_peer)
-            }else{
-                console.log('I Know This Guy: ', remote_peer)
+            }else if(message.header == "__Data"){
+                //console.log('I Know This Guy: ', remote_peer)
             }
         }
     }
@@ -105,11 +105,11 @@ class Client{
     }
 
     setTcpEndHandler(onTcpEndCallback){
-        this.onEndCallback = onTcpEndCallback
+        this.onTcpEndCallback = onTcpEndCallback
     }
 
     setTcpErrorHandler(onTcpErrorCallback){
-        this.onServerErrorCallback = onTcpErrorCallback
+        this.onTcpErrorCallback = onTcpErrorCallback
     }
 
     getPeer(host, port){
@@ -120,15 +120,19 @@ class Client{
     }
 
     ConnectToPeer(host, port){
-        let peer = this.getPeer(host, port)
+        let peer = this.getClient(host, port)
         if(!peer){
             console.log('Peer is not recognized')
             return
         }
 
+        let options = {
+            'host': peer.address,
+            'port': peer.port
+        }
         // Create TCP client.
         var client = net.createConnection(options, function () {
-            console.log('Connection name : ' + connName);
+            console.log('Connection name : ' + peer.name);
             console.log('Connection local address : ' + client.localAddress + ":" + client.localPort);
             console.log('Connection remote address : ' + client.remoteAddress + ":" + client.remotePort);
         })
@@ -149,7 +153,7 @@ class Client{
         })
         */
 
-        client.on('error', this.onEndCallback)
+        client.on('error', this.onTcpErrorCallback)
 
         return client
     }
@@ -157,6 +161,25 @@ class Client{
 
 var client = new Client("client")
 client.Start()
+
+client.setTcpDataHandler(function(data){
+    console.log(data)
+})
+
+client.setTcpEndHandler(function(){
+    console.log('connection endded')
+})
+
+client.setTcpErrorHandler(function(err){
+    console.log(err)
+})
+
+setTimeout(()=>{
+    var host = client.foundPeers[0].address,
+        port = client.foundPeers[0].port
+    console.log(host, port)
+    client.ConnectToPeer(host, port)
+}, 20000)
 
 /*
 function createClient(connName, host, port){
