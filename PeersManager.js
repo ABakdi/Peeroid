@@ -1,3 +1,4 @@
+import UuidTool from 'uuid-tool'
 class PeersManager{
     constructor(){
         this.peers = []

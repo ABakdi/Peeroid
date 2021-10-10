@@ -1,56 +1,60 @@
-let products = new Proxy({
-  browsers: ['Internet Explorer', 'Netscape']
-},
-{
-  get: function(obj, prop) {
-    // An extra property
-    if (prop === 'latestBrowser') {
-      return obj.browsers[obj.browsers.length - 1];
-    }
+import Server from '../server.js'
+import Client from '../client.js'
 
-    // The default behavior to return the value
-    return obj[prop];
-  },
-  set: function(obj, prop, value) {
-    // An extra property
-    if (prop === 'latestBrowser') {
-      obj.browsers.push(value);
-      return true;
-    }
+const client = new Client("client")
+const server = new Server("server")
 
-    // Convert the value if it is not an array
-    if (typeof value === 'string') {
-      value = [value];
-    }
+client.setTcpDataHandler(function(data){
+    console.log(data)
+})
 
-    // The default behavior to store the value
-    obj[prop] = value;
+client.setTcpEndHandler(function(){
+    console.log('connection endded')
+})
 
-    // Indicate success
-    return true;
-  },
-
-});
+client.setTcpErrorHandler(function(err){
+    console.log(err)
+})
 
 
-products.browsers.push('kkkkkkmm')
-console.log(products.browsers)
-//console.log(products.browsers);
-/*
-console.log(products.browsers);
-//  ['Internet Explorer', 'Netscape']
 
-products.browsers = 'Firefox';
-//  pass a string (by mistake)
 
-console.log(products.browsers);
-//  ['Firefox'] <- no problem, the value is an array
+server.setNewTcpClientHandler(function(client){
+  console.log('new Tcp Client:', client)
+})
 
-products.latestBrowser = 'Chrome';
+server.setServerCloseHandler(function(){
+  console.log("server closed")
+})
 
-console.log(products.browsers);
-//  ['Firefox', 'Chrome']
+server.setServerErrorHandler(function(error){
+  console.log('Error: ', error)
+})
 
-console.log(products.latestBrowser);
-//  'Chrome'
-*/
+server.setTcpDataHandler(function(data){
+  console.log("recived: ", data)
+})
+
+server.setTcpEndHandler(function(){
+  console.log('client disconnect')
+})
+
+
+client.Start()
+server.Start()
+
+server.Search(6562, function(obj){
+  console.log('found peer')
+})
+
+setTimeout(()=>server.stopSearching(), 15000)
+
+
+setTimeout(()=>{
+    var host = client.foundPeers[0].address,
+        port = client.foundPeers[0].port
+    console.log(host, port)
+    client.ConnectToPeer(host, port)
+}, 20000)
+
+

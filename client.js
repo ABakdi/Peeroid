@@ -15,12 +15,19 @@ class Client{
         if(!name){
             throw "Client Must Have A Name!"
         }
-
+        //contains list of servers we are connected to with Tcp
         this.Servers = new PeersManager()
+        // if true we can be found when searching
         this.visible = visible
+        // called when recieving data with tcp
         this.onTcpDataCallback = undefined
+        // called when tcp connection end
         this.onTcpEndCallback = undefined
+        // called when tcp erro occurs
         this.onTcpErrorCallback = undefined
+        //called when connected to new tcp peer
+        this.onNewTcpConnection
+        
         this.name = name
         this.id = uuidv4()
         this.UdpClient = dgram.createSocket('udp4')
@@ -72,10 +79,16 @@ class Client{
                 // if the remote peer is new
                 // add it to the list of Peers
                 this.foundPeers.push(remote_peer)
-            }else if(message.header == "__Data"){
-                //console.log('I Know This Guy: ', remote_peer)
             }
+
         }
+    }
+
+    getPeerById(id){
+        return this.foundPeers.find((client)=>{
+            if(id == client.id)
+                return true
+        })
     }
 
     Start(){
@@ -92,24 +105,33 @@ class Client{
                 this.discoveryHandler(message, remote)
 
             // if remote is sending something other than "__Ping"
-            }else{
-
+            }else if(message.header == "__CONNECT"){
+                this.ConnectToPeer(message.body.id)
             }
 
         })
         this.UdpClient.bind(6562)
+        return this
     }
 
     setTcpDataHandler(onTcpDataCallback){
         this.onTcpDataCallback = onTcpDataCallback
+        return this
     }
 
     setTcpEndHandler(onTcpEndCallback){
         this.onTcpEndCallback = onTcpEndCallback
+        return this
     }
 
     setTcpErrorHandler(onTcpErrorCallback){
         this.onTcpErrorCallback = onTcpErrorCallback
+        return this
+    }
+    
+    setNewTcpConnectionHandler(onNewTcpConnection){
+        this.onNewTcpConnection = onNewTcpConnection
+        return this
     }
 
     getPeer(host, port){
@@ -119,8 +141,8 @@ class Client{
         })
     }
 
-    ConnectToPeer(host, port){
-        let peer = this.getClient(host, port)
+    ConnectToPeer(id){
+        let peer = this.getPeerById(id)
         if(!peer){
             console.log('Peer is not recognized')
             return
@@ -130,13 +152,31 @@ class Client{
             'host': peer.address,
             'port': peer.port
         }
-        // Create TCP client.
-        var client = net.createConnection(options, function () {
-            console.log('Connection name : ' + peer.name);
-            console.log('Connection local address : ' + client.localAddress + ":" + client.localPort);
-            console.log('Connection remote address : ' + client.remoteAddress + ":" + client.remotePort);
-        })
 
+        var tcpClient = {
+            id: null,
+            name: null,
+            address: null,
+            port: null,
+            ref: null
+        }
+        // Create TCP client.
+        var client = net.createConnection(options, ()=>{
+            let info = {
+                'localAdress': client.localAddress,
+                'remoteAddress': client.remoteAddress,
+                'name': peer.name,
+                'id': peer.id
+            }
+            var address_temp = client.remoteAddress.split(':')
+            tcpClient.address = address_temp
+            tcpClient.port = address_temp[1]
+            tcpClient.name = peer.name
+            tcpClient.id = peer.id
+            tcpClient.ref = client
+            this.Servers.addPeer(tcpClient)
+            this.onNewTcpConnection(info)
+        })
         //client.setTimeout(1000)
 
         client.setEncoding('utf8')
@@ -155,10 +195,17 @@ class Client{
 
         client.on('error', this.onTcpErrorCallback)
 
-        return client
+    }
+    
+    destroyConnection(id, onConnectionDestroyed){
+        let client = this.Servers.getPeerById(id)
+        client.ref.destroy()
+        onConnectionDestroyed(client)
     }
 }
 
+export default Client
+/*
 var client = new Client("client")
 client.Start()
 
@@ -180,91 +227,4 @@ setTimeout(()=>{
     console.log(host, port)
     client.ConnectToPeer(host, port)
 }, 20000)
-
-/*
-function createClient(connName, host, port){
-
-    var option = {
-        host:host,
-        port: port
-    }
-    // Create TCP client.
-    var client = net.createConnection(option, function () {
-        client.name = connName
-        console.log('Connection name : ' + connName);
-        console.log('Connection local address : ' + client.localAddress + ":" + client.localPort);
-        console.log('Connection remote address : ' + client.remoteAddress + ":" + client.remotePort);
-    })
-
-    client.setTimeout(1000)
-    client.setEncoding('utf8')
-
-    // When receive server send back data.
-    client.on('data', function (data) {
-        console.log('Server return data : ' + data)
-    })
-
-    // When connection disconnected.
-    client.on('end',function () {
-        console.log('Client socket disconnect. ')
-    })
-
-    client.on('timeout', function () {
-        console.log('Client connection timeout. ')
-    })
-
-    client.on('error', function (err) {
-        console.error(JSON.stringify(err))
-    })
-
-    return client
-}
-
-
-var PORT = 6562
-var client = dgram.createSocket('udp4')
-var TcpClient = null
-var recognized_Servers = []
-
-function isRemoteRecognized(remote){
-    if(this.address == remote.address && this.port == remote.port)
-        return true
-      return false
-}
-
-function echoPresence(visible, client, rinfo){
-    if(visible){
-        const message = Buffer.from('__Echo')
-        client.send(message, 0, message.length, rinfo.port, rinfo.address,  function(){
-            console.log("Sent: "+ message)
-        })
-    }
-}
-
-client.on('listening', function () {
-    var address = client.address();
-    console.log('UDP Client listening on ' + address.address + ":" + address.port)
-    //client.setBroadcast(true)
-})
-
-client.on('message', function (message, rinfo) {
-    console.log('Message from: ' + rinfo.address + ':' + rinfo.port +' - ' + message);
-    const remote_server = {
-        "address":rinfo.address,
-        "port": rinfo.port
-    }
-    const isRemoteNew = !recognized_Servers.some(isRemoteRecognized,
-                                                remote_server)
-    if(message == "__Ping" && isRemoteNew){
-        console.log('New Guy: ', remote_server)
-        recognized_Servers.push(remote_server)
-        TcpClient = createClient('new guy', rinfo.address, rinfo.port)
-        echoPresence(true, client, rinfo)
-    }else{
-        console.log("I Know This Guy", remote_server)
-        echoPresence(true, client, rinfo)
-    }
-})
-
-client.bind(PORT)
 */

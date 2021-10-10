@@ -164,6 +164,13 @@ class Server{
     })
   }
 
+  getPeerbyId(id){
+    return this.foundPeers.find((client)=>{
+      if(id == client.id)
+        return true
+    })
+  }
+
   UdpListen(){
 
     this.UdpServer.on('message', (message, remote)=>{
@@ -172,7 +179,7 @@ class Server{
 
       const isRemoteRecognized = this.getClient(remote.address, remote.port)
 
-      console.log('found peers:', this.foundPeers)
+      // console.log('found peers:', this.foundPeers)
 
       if(message.header == "__Echo" && !isRemoteRecognized){
 
@@ -183,14 +190,12 @@ class Server{
           'port': remote.port
         }
 
-        console.log('New Guy: ', remote_peer)
+        // console.log('New Guy: ', remote_peer)
 
         this.foundPeers.push(remote_peer)
+        this.onNewPeerFound(remote_peer)
 
-      }else{
-        console.log('I Know This Guy: ')
       }
-
     })
 
   }
@@ -211,10 +216,7 @@ class Server{
         }
       }
       message = Buffer.from(JSON.stringify(message))
-      this.UdpSend(message, PORT, BROADCAST_ADDR,function(){
-        message = JSON.parse(message.toString())
-        console.log(message)
-      })
+      this.UdpSend(message, PORT, BROADCAST_ADDR)
     }
 
     clearInterval(this.UdpBroadcast)
@@ -229,13 +231,32 @@ class Server{
     clearInterval(this.UdpBroadcast)
   }
 
+  ConnectToPeer(id){
+    var peer = this.getPeerbyId(id)
+    if(!peer){
+      return
+    }
+
+    let message = {
+      'header': "__CONNECT",
+      'body':{
+        'id': this.id,
+        'name': this.name
+      }
+    }
+
+    message = Buffer.from(JSON.stringify(message))
+
+    this.UdpSend(message, peer.port, peer.address)
+  }
+
 }
 
 
 
 
-
-
+export default Server
+/*
 const server = new Server("server")
 
 server.setNewTcpClientHandler(function(client){
@@ -264,96 +285,10 @@ server.Search(6562, function(obj){
   console.log('found peer')
 })
 
-setTimeout(()=>server.stopSearching(), 15000)
-
-
-/*
-var UdpServer = dgram.createSocket('udp4')
-// list of clients that echoed our ping
-// this is necessary to avoid back and forth (echo ping)
-// so once a remote client echoes our pign it should added to this list
-// and then ignored
-var recognized_clients = []
-
-
-const TcpServer = net.createServer(function(client){
-  console.log('Clent connected')
-  console.log('client local address: '+client.localAddress+':'+client.localPort)
-  console.log('client remote address: '+client.remoteAddress+':'+client.remotePort)
-
-  client.setEncoding('utf-8')
-
-  //handle reciving data from client
-  client.on('data', function(data){
-    console.log('Receive client send data : ' + data + ', data size : ' + client.bytesRead)
-  })
-
-  client.on('end', function () {
-
-    console.log('Client disconnect.')
-    // Get current connections count.
-    TcpServer.getConnections(function (err, count) {
-      if(!err){
-        // Print current connection count in server console.
-        console.log("There are %d connections now. ", count)
-      }else{
-        console.error(JSON.stringify(err))
-      }
-    })
-  })
-})
-///// Utility Functions
-function broadcastPresence(){
-  var message = Buffer.from("__Ping")
-  UdpServer.send(message, 0, message.length, PORT, BROADCAST_ADDR,function(){
-    console.log("Sent: '" + message + "'")
-  })
-}
-
-function isRemoteRecognized(client){
-  if(this.address == client.address && this.port == client.port)
-    return true
-  return false
-}
-
-UdpServer.bind(function(){
-  const serverPort = UdpServer.address().port
-
-  TcpServer.listen(serverPort, function () {
-    // Get server address info.
-    var TcpServerInfo = TcpServer.address()
-    var TcpServerInfoJson = JSON.stringify(TcpServerInfo)
-
-    console.log('TCP server listen on address : ' + TcpServerInfoJson)
-
-    TcpServer.on('close', function () {
-        console.log('TCP server socket is closed.')
-    });
-
-    TcpServer.on('error', function (error) {
-        console.error(JSON.stringify(error))
-    })
-  })
-
-  UdpServer.setBroadcast(true)
-  setInterval(broadcastPresence, 3000)
-})
-
-UdpServer.on('message', function(message, remote){
-  const remote_client = {
-    "address": remote.address,
-    "port": remote.port
-  }
-
-  const isRemoteNew = !recognized_clients.some(isRemoteRecognized,
-                                                   remote_client)
-  
-  if(message == "__Echo" && isRemoteNew){
-    console.log('New Guy: ', remote_client)
-    recognized_clients.push(remote_client)
-  }else{
-    console.log('I Know This Guy: ', remote_client)
-  }
-  
-})
+setTimeout(()=>{
+  server.stopSearching()
+  console.log(server.foundPeers)
+  var id = server.foundPeers[0].id
+  server.ConnectToPeer(id)
+}, 9000)
 */
