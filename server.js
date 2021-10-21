@@ -1,5 +1,6 @@
 import broadcastAddress from 'broadcast-address'
 import dgram from 'dgram'
+import { resolve } from 'dns'
 import net from 'net'
 import { v4 as uuidv4 } from 'uuid'
 import PeersManager from './PeersManager.js'
@@ -124,7 +125,7 @@ class Server{
     this.onNewTcpClientCallback = onNewTcpClientCallback
   }
 
-  setServerCloseHandler(onServerClose){
+  setServerCloseHandler(onSer verClose){
     this.onServerCloseCallback = onServerClose
   }
 
@@ -195,6 +196,8 @@ class Server{
         this.foundPeers.push(remote_peer)
         this.onNewPeerFound(remote_peer)
 
+      }else if(message.header == '__ACCCEPT'){
+        this.AcceptCallback(message.body.answer)
       }
     })
 
@@ -231,7 +234,8 @@ class Server{
     clearInterval(this.UdpBroadcast)
   }
 
-  ConnectToPeer(id){
+  ConnectToPeer(id, async callback){
+    this.AcceptCallback = callback
     var peer = this.getPeerbyId(id)
     if(!peer){
       return
@@ -248,7 +252,7 @@ class Server{
     message = Buffer.from(JSON.stringify(message))
 
     this.UdpSend(message, peer.port, peer.address)
-  }
+    checkAcceptenceInterval = clearInterval()
 
 }
 

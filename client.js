@@ -26,7 +26,11 @@ class Client{
         // called when tcp erro occurs
         this.onTcpErrorCallback = undefined
         //called when connected to new tcp peer
-        this.onNewTcpConnection
+        this.onNewTcpConnection = undefined
+        // called when peer wants to connect it returns true if accept (this is an asynchronos call)
+        this.onTcpConnectionRequest = undefined
+        //called when remote client connection request is refused
+        this.onTcpRefusedConnection = undefined
         
         this.name = name
         this.id = uuidv4()
@@ -92,7 +96,7 @@ class Client{
     }
 
     Start(){
-        this.UdpClient.on('message', (message, remote)=>{
+        this.UdpClient.on('message', async (message, remote)=>{
 
 
             // convert message to JOSN
@@ -106,7 +110,13 @@ class Client{
 
             // if remote is sending something other than "__Ping"
             }else if(message.header == "__CONNECT"){
-                this.ConnectToPeer(message.body.id)
+                let permission = await this.onTcpConnectionRequest(message.body)
+                if(permission){
+                    this.ConnectToPeer(message.body.id)
+                }else{
+                    if(onTcpRefusedConnection)
+                        this.onTcpRefusedConnection()
+                }
             }
 
         })
@@ -132,6 +142,10 @@ class Client{
     setNewTcpConnectionHandler(onNewTcpConnection){
         this.onNewTcpConnection = onNewTcpConnection
         return this
+    }
+
+    setTcpConnectionRequestHandler(onTcpConnectionRequest){
+        this.onTcpConnectionRequest = onTcpConnectionRequest
     }
 
     getPeer(host, port){

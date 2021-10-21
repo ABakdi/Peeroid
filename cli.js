@@ -6,7 +6,7 @@ import Client from './client.js'
 
 const help = "\n help start search connect send standby"
 var prevent_normal_operation = false
-
+var wait_for_answer = false
 var command = ''
 var lastTyped = ''
 var history = [],
@@ -52,10 +52,21 @@ function ConnectByName(name){
         term.red('\nno Such Peer: '+ name)
     }
 }
+
 function ConnectById(id){
     var peer = peers_list.find((e)=> e.id == id)
     if(peer){
-        server.ConnectToPeer(peer.id)
+        server.ConnectToPeer(peer.id, function(answer){
+            return new Promise( resolve =>{
+                resolve(answer)
+            })
+        })
+
+        if(answer){
+            term.green(peer.name + ":"+ peer.id + " accepted connection")
+        }else{
+            term.red(peer.name + ":"+ peer.id + " refused connection")
+        }
     }else{
         term.red('\nno Such Peer id: '+ id)
     }
@@ -90,6 +101,16 @@ function SendUdp(name, payload){
 function StandBy(name){
     let client = new Client(name)
 
+    client.setTcpConnectionRequestHandler(function(peer){
+        wait_for_answer = true
+        term(peer.id + " : "+ peer.name+" want's to connect to you:[Y|n]\n")
+        return new Promise(resolve => {
+            term.yesOrNo({yes: ['y', 'ENTER'], no:['n']}, function(error, result){
+                resolve(result)
+            })
+        })
+    })
+
     client.setTcpDataHandler(function(data){
         term.white(data)
     })
@@ -113,7 +134,6 @@ function StandBy(name){
     prevent_normal_operation = true
     term.grey("\nStandby mode: waiting for data\n CTRL_X to exit.\n")
 }
-
 
 
 // handle deleting charecters with backspace
@@ -188,7 +208,7 @@ term.on('key', async function(key, matches, data){
         return
     }
 
-    if(prevent_normal_operation)
+    if(prevent_normal_operation || wait_for_answer)
         return
 
     switch(key){
