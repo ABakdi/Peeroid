@@ -144,6 +144,8 @@ class Server{
 
       }else if(message.header == '__ACCCEPT'){
         this.EventBus.emit('peer-accept', message.body.answer, message.body.id)
+      }else if(message.header =='__Data'){
+        this.EventBus.emit('udp-data', ...message.body)
       }
     })
 
