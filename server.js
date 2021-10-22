@@ -1,74 +1,30 @@
 import broadcastAddress from 'broadcast-address'
 import dgram from 'dgram'
-import { resolve } from 'dns'
 import net from 'net'
-import { v4 as uuidv4 } from 'uuid'
-import PeersManager from './PeersManager.js'
-/*
- * .The primary function of this class is to send a ping
- *  an listen for echoes.
- *
- * .reciving an echo from an address means that there is a client visible
- *  and ready for connection.
- *
- * .
- *
- */
+import EventEmitter from 'events'
 
 class Server{
 
-  /*-------------------*important callback functions*---------------------
-   *
-   * onNewPeerFound: will be called when a remote peer echoes server's ping
-   * and added to foud peers list
-   *
-   * ****************** Server Events Handlers ***********************
-   *
-   * --------------------- setServerCloseHandler ------------------
-   * -onServerCloseCallback(...args): will ba called
-   * when server closes
-   *
-   *---------------------- setServerErrorHandler ------------------
-   * -onServerErrorCallback(error, ...args): will be called
-   * when server error occurs
-   *
-   * ****************** Client Event Handlers ***************************
-   *
-   * ------------------ setNewTcpClientCallback ----------------------
-   * -onNewTcpClientCallback(...args): function will be called
-   * once a tcp client connects to server
-   * -------------------- setTcpDataHandler ----------------------
-   * -onTcpDataCallback(data, ...args): function will be called when
-   * we start recieving data from tcp client
-   *
-   * -------------------- setTcpEndHandler -----------------------
-   * -onEndCallback(...args): function will be called when
-   * Tcp client end connection
-   * -------------------------------------------------------------
-   *
-   */
-
-  constructor(name){
+  constructor(name, id, EventBus){
     if(!name){
       throw "server must have a name"
     }
 
-    //all handlers are undefined when class is constructed
-    this.onTcpDataCallback = undefined
-    this.onEndCallback = undefined
-    this.onServerCloseCallback = undefined
-    this.onServerErrorCallback = undefined
-    this.onNewTcpClientCallback = undefined
-    this.onUdpDataCallback = undefined
-    this.onNewPeerFound = undefined
+    if(!id){
+      throw "server must have an id"
+    }
+
+    this.eventsList = ['tcp-data', 'tcp-end', 'tcp-close', 'tcp-error', 'tcp-client',
+                       'udp-data', 'found-peer', 'peer-accept']
+
 
     this.name = name
-    this.id = uuidv4()
+    this.id = id
+    this.EventBus = EventBus
     //reference to broadcast set interval
     this.UdpBroadcast = null
 
-    //this will store a list of clients and will
-    // handle adding data and end handlers once new tcp client connect
+    //this will store a list of clients
     this.Clients = new PeersManager()
 
     // remote peer found when serched for
@@ -76,27 +32,32 @@ class Server{
 
     this.UdpServer = dgram.createSocket('udp4')
 
-    this.TcpServer = net.createServer((tcp_client)=>{
+    // internal events #peer-echo is handled by discovery_handler method
+    this.EventBus.on('#peer-echo', this.#discovery_handler)
 
+    this.TcpServer = net.createServer((tcp_client)=>{
+      // all the code in here will be excuted when
+      // new tcp client connects to to this server
+      // infromation related to the client are in tcp_client
+
+      // use utf encodeing for messaging
       tcp_client.setEncoding('utf-8')
 
-      if(this.onNewTcpClientCallback)
-        this.onNewTcpClientCallback(tcp_client)
+      // emit 'tcp-client' with the relevant information
+      this.EventBus.emit('tcp-client', tcp_client)
 
       let TcpClient = {
-        ...this.getClient(tcp_client.remoteAddress, tcp_client.port),
+        ...this.getClientByAddress(tcp_client.remoteAddress, tcp_client.port),
         ref: tcp_client
       }
 
-      if(!this.onTcpDataCallback)
-        throw "you should define onTcpDataCallback first"
-      if(!this.onEndCallback)
-        throw "you should define onEndCallback first"
+      TcpClient.ref.on('data',(data)=>{
+        this.EventBus.emit('tcp-data', data)
+      })
 
-
-      TcpClient.ref.on('data',this.onTcpDataCallback)
-
-      TcpClient.ref.on('end', this.onEndCallback)
+      TcpClient.ref.on('end', ()=>{
+        this.EventBus.emit('tcp-end')
+      })
 
 
       this.Clients.addPeer(TcpClient)
@@ -104,39 +65,11 @@ class Server{
     })
 
   }
-
-
-  get serverRef(){
-    return {
-      "UdpServer": this.UdpServer,
-      "TcpServer": this.TcpServer
-    }
-  }
-
-  setTcpDataHandler(onTcpDataCallback){
-    this.onTcpDataCallback = onTcpDataCallback
-  }
-
-  setTcpEndHandler(onEndCallback){
-    this.onEndCallback = onEndCallback
-  }
-
-  setNewTcpClientHandler(onNewTcpClientCallback){
-    this.onNewTcpClientCallback = onNewTcpClientCallback
-  }
-
-  setServerCloseHandler(onSer verClose){
-    this.onServerCloseCallback = onServerClose
-  }
-
-  setServerErrorHandler(onServerError){
-    this.onServerErrorCallback = onServerError
-  }
-
   //bind Udp and listen to tcp requests on the same port
   Start(){
     this.UdpServer.bind(()=>{
 
+      // make this udp socket able to brodcast
       this.UdpServer.setBroadcast(true)
 
       //udp and tcp servers will bind to the same port
@@ -144,13 +77,25 @@ class Server{
 
       this.TcpServer.listen(server_port, ()=>{
 
-        this.TcpServer.on('close', this.onServerCloseCallback)
+        this.TcpServer.on('close', ()=>{
+          this.EventBus.emit('tcp-close')
+        })
 
-        this.TcpServer.on('error', this.onServerErrorCallback)
+        this.TcpServer.on('error', (error)=>{
+          this.EventBus.emit('tcp-error', error)
+        })
       })
 
     })
     this.UdpListen()
+  }
+
+  addEventListener(event, callback){
+    if (!this.eventsList.includes(event)){
+      throw 'event does not exist'
+    }else{
+      this.EventBus.addEventListener(event, callback)
+    }
   }
   
   UdpSend(message, Port, Address, onSendCallback){
@@ -158,18 +103,26 @@ class Server{
     this.UdpServer.send(message, 0, message.length, Port, Address, onSendCallback)
   }
 
-  getClient(address, port){
+  getClientByAddress(address, port){
     return this.foundPeers.find((client)=>{
       if(address == client.address && port == client.port)
         return true
     })
   }
 
-  getPeerbyId(id){
+  getClientById(id){
     return this.foundPeers.find((client)=>{
       if(id == client.id)
         return true
     })
+  }
+
+  #discovery_handler(id, name, address, port){
+    const isRemoteRecognized = this.getClientByAddress(remote.address, remote.port)
+    if(!isRemoteRecognized){
+      this.foundPeers.push(remote_peer)
+      this.EventBus.emit('found-peer', remote_peer)
+    }
   }
 
   UdpListen(){
@@ -178,11 +131,7 @@ class Server{
 
       message = JSON.parse(message.toString())
 
-      const isRemoteRecognized = this.getClient(remote.address, remote.port)
-
-      // console.log('found peers:', this.foundPeers)
-
-      if(message.header == "__Echo" && !isRemoteRecognized){
+      if(message.header == "__Echo"){
 
         const remote_peer = {
           'id': message.body.id,
@@ -191,13 +140,10 @@ class Server{
           'port': remote.port
         }
 
-        // console.log('New Guy: ', remote_peer)
-
-        this.foundPeers.push(remote_peer)
-        this.onNewPeerFound(remote_peer)
+        this.EventBus.emit('#peer-echo', ...remote_peer)
 
       }else if(message.header == '__ACCCEPT'){
-        this.AcceptCallback(message.body.answer)
+        this.EventBus.emit('peer-accept', message.body.answer, message.body.id)
       }
     })
 
@@ -205,7 +151,7 @@ class Server{
 
 
 
-  Search(port, onNewPeerFound){
+  Search(port, interval = 3){
 
     const BROADCAST_ADDR = broadcastAddress('wlan0')
     const PORT = port
@@ -224,9 +170,8 @@ class Server{
 
     clearInterval(this.UdpBroadcast)
 
-    this.UdpBroadcast = setInterval(broadcastPresence, 3000)
+    this.UdpBroadcast = setInterval(broadcastPresence, interval*1000)
 
-    this.onNewPeerFound = onNewPeerFound
 
   }
 
@@ -234,9 +179,8 @@ class Server{
     clearInterval(this.UdpBroadcast)
   }
 
-  ConnectToPeer(id, async callback){
-    this.AcceptCallback = callback
-    var peer = this.getPeerbyId(id)
+  ConnectToPeer(id){
+    var peer = this.getClientById(id)
     if(!peer){
       return
     }

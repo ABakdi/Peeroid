@@ -1,87 +1,81 @@
 ---
 tags: [udp-discovery Docs]
 title: Server
-created: '2021-10-16T23:30:23.810Z'
-modified: '2021-10-17T20:38:03.392Z'
 ---
 
 # Server
 
 ### 1. Events: 
-- external events(the user can acces them directly):
+- external events(can be set with addEventListener method):
 
-|event name |handler                |current callback with parameters
-|-----------|-----------------------|--------------------------------
-|tcp-data   |onTcpDataCallback      |
-|tcp-end    |onEndCallback          |
-|tcp-close  |onServerCloseCallback  |
-|tcp-error  |onServerErrorCallbak   |
-|tcp-client |onNewTcpClientcallback |
-|udp-data   |onUdpDataCallBack      |
-|found-peer |onNewPeerFound         |
+| event name  | Trigger                                                       |parameters
+|-------------|---------------------------------------------------------------|--------------------------------
+| tcp-data    |reciving tcp data                                              | data
+| tcp-end     |client ending tcp connection                                   | no-parameters
+| tcp-close   |client closing tcp connection                                  | no-parameters
+| tcp-error   |error occuring in tcp server                                   | error
+| tcp-client  |new tcp client connected                                       | tcp_client
+| udp-data    |reciving udp message with ```__Data``` header                  | 
+| found-peer  |discovery_handler gets new client                              | remote_peer
+| peer-accept |recieving udp massage with ```__Accept``` hedar                | id, answer
 
 - internal events (only acceceble inside this class)
 
-| event name    | emitted by(method)   |trigger                          |
-|---------------|----------------------|---------------------------------|
-| #peer-echo    | UdpListen            | recieving ```__Echo``` from peer| 
+| event name    | emitted by(method)   | trigger                         | parameters             | handler
+|---------------|----------------------|---------------------------------|------------------------|----------------------
+| #peer-echo    | UdpListen            | recieving ```__Echo``` from peer| id, name, address, port| #discovery handler
 
 #### how the server class suppose to work:
 ```javascript
 import Server from 'Server'
-const server = new Server(name)
+import EventEmitter from 'events'
+const EventBus = new EventEmitter()
+
+const server = new Server('name', 'id', EventBus)
+
 server.addEventListner('found-peer', function(peer){
   console.log(peer)
 })
+
 //addEvent listener can use any of the events above
 ```
 
 ### 2. Methods:
 #### 2.1. Public:
-  1. ~~get ServerRef~~:
-      returns an object containing a refrence to udpSocket and tcpSocket
-      
-  ```json
-    {
-      "UdpServer": this.UdpServer,
-      "TcpServer": this.TcpServer
-    }
-  ``` 
-
-  2. *~~setSomeEventHandler~~:
-    a set of methods that are used to assing callbackfunction for a specific tcp or udp events 
-    **Replaced with**:
-        ```Server.addEventListener('SomeEvent', callback)```
-        this new implementation will encapsulate all tcp and udp and our own events into internal and external set of events to make everything easier.
+  1. addEventListener:
+  ```javascript
+  Server.addEventListener('SomeEvent', callback)
+  ```
+  this new implementation will encapsulate all tcp and udp and our own events into internal and external set of events to make everything easier.
   
-  3. Start:
+  2. Start:
     binds udp socket and and listen on tcp/udp sockets
     This methods is the heart of this class.
-    <br/>
-    3. 1. Events Emitted:
+    
+    2.1. Events Emitted:
     ---->```tcp-close```
     ---->```tcp-error```
 
-  4. UdpSend:
+  3. UdpSend:
   sends message to a specific address:port using the udp socket
   ```javascript
   UdpSend(message, Port, Address, onSendCallback)
   ```
-  5. UdpListen:
+  4. UdpListen:
   This is "the brain" of the server
-  this function listen for udp messages and act according to the the header of the message *See: [message Structure](message structer) 
+  this function listen for udp messages and act according to the the header of the message *See: [message Structure](#message structer) 
   *Emitted Events:*
-  -----> ```#peer-echo```
+  -----> ```#peer-echo``` 
   -----> ```peer-accept```
 
-  6. Search:
+  5. Search:
   search for peers on a specific port 
   it broadcasts a udp ```__Ping``` message  periodically and listen for ```peer-echo``` Events that are fired by the ```UdpListen``` methdos when a peer returns an ```__Echo``` message
   **Emitted Events**:
   ----> ```found-peer```
 
-  7. StopSearching:
-    stops sending '__Ping
+  6. StopSearching:
+    stops sending ```__Ping``` Signals
 
 
 
@@ -97,11 +91,11 @@ server.addEventListner('found-peer', function(peer){
       }
     }
 ```
-|Header         |body                            |
+|header         |body                            |
 |---------------|--------------------------------|
 | __Ping        |name, id, address, port         |
 | __Echo        |name, id, address, port         |
-| __Accept      |answer(yes/no)                  |
+| __Accept      |answer(yes/no), id              |
 | __Data-struct |name, extension,stamp, length   |
 | __Data        |stamp, sequence, data           |
 
