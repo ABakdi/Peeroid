@@ -21,9 +21,9 @@ title: Server
 
 - internal events (only acceceble inside this class)
 
-| event name    | emitted by(method)   | trigger                         | parameters             | handler
-|---------------|----------------------|---------------------------------|------------------------|----------------------
-| #peer-echo    | UdpListen            | recieving ```__Echo``` from peer| id, name, address, port| #discovery handler
+| event name    | emitted by(method)   | trigger                         | parameters                | handler
+|---------------|----------------------|---------------------------------|---------------------------|----------------------
+| #peer-echo    | UdpListen            | recieving ```__Echo``` from peer| {id, name, address, port} | #discovery handler
 
 #### how the server class suppose to work:
 ```javascript
@@ -95,12 +95,13 @@ server.addEventListner('found-peer', function(peer){
       }
     }
 ```
-|header         |body                            |
-|---------------|--------------------------------|
-| __Ping        |name, id, address, port         |
-| __Echo        |name, id, address, port         |
-| __Accept      |answer(yes/no), id              |
-| __Data-struct |name, extension,stamp, length   |
-| __Data        |stamp, sequence, data           |
+| header             | body                              | protocol |
+|--------------------|-----------------------------------|----------|
+| __Ping             | name, id, address, port           | udp      |
+| __Echo             | name, id, address, port           | udp      |
+| __Accept           | answer(yes/no), id                | udp      |
+| __Data-structer    | name, extension,stamp, key,length | tcp      |
+| __Fragment-request | stamp, sequence, key              | tcp      |
+| __Data             | stamp, key, sequence, data        | udp      |
 
 

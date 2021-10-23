@@ -117,8 +117,8 @@ class Server{
     })
   }
 
-  #discovery_handler(id, name, address, port){
-    const isRemoteRecognized = this.getClientByAddress(remote.address, remote.port)
+  #discovery_handler(remote_peer){
+    const isRemoteRecognized = this.getClientByAddress(remote_peer.address, remote_peer.port)
     if(!isRemoteRecognized){
       this.foundPeers.push(remote_peer)
       this.EventBus.emit('found-peer', remote_peer)
@@ -140,7 +140,7 @@ class Server{
           'port': remote.port
         }
 
-        this.EventBus.emit('#peer-echo', ...remote_peer)
+        this.EventBus.emit('#peer-echo', remote_peer)
 
       }else if(message.header == '__ACCCEPT'){
         this.EventBus.emit('peer-accept', message.body.answer, message.body.id)
@@ -150,8 +150,6 @@ class Server{
     })
 
   }
-
-
 
   Search(port, interval = 3){
 
@@ -188,7 +186,7 @@ class Server{
     }
 
     let message = {
-      'header': "__CONNECT",
+      'header': "__Connect",
       'body':{
         'id': this.id,
         'name': this.name

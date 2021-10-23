@@ -2,6 +2,7 @@ import dgram from 'dgram'
 import net from 'net'
 import PeersManager from './PeersManager.js'
 import {v4 as uuidv4} from 'uuid'
+import { error } from 'console'
 /*
  * .the primary function of this class is to listen for servers ping
  *  if it is set to visible it will emmit an echo.
@@ -10,37 +11,43 @@ import {v4 as uuidv4} from 'uuid'
  */
 class Client{
 
-    constructor(name, visible=true){
+    constructor(name, id, EventBus, visible=true){
 
         if(!name){
-            throw "Client Must Have A Name!"
+            throw "client must have a name"
         }
+
+        if(!id){
+            throw "client must have an id"
+        }
+
         //contains list of servers we are connected to with Tcp
         this.Servers = new PeersManager()
+
         // if true we can be found when searching
         this.visible = visible
-        // called when recieving data with tcp
-        this.onTcpDataCallback = undefined
-        // called when tcp connection end
-        this.onTcpEndCallback = undefined
-        // called when tcp erro occurs
-        this.onTcpErrorCallback = undefined
-        //called when connected to new tcp peer
-        this.onNewTcpConnection = undefined
-        // called when peer wants to connect it returns true if accept (this is an asynchronos call)
-        this.onTcpConnectionRequest = undefined
-        //called when remote client connection request is refused
-        this.onTcpRefusedConnection = undefined
-        
+
         this.name = name
-        this.id = uuidv4()
+        this.id = id
+
+        this.EventBus = EventBus
+
         this.UdpClient = dgram.createSocket('udp4')
 
         this.foundPeers = []
+
+        this.EventBus.on('#peer-ping', this#discoveryHandler)
     }
 
     setVisible(visible){
         this.visible = visible
+    }
+
+    getServerById(id){
+        return this.foundPeers.find((client)=>{
+            if(id == client.id)
+                return true
+        })
     }
 
     getClient(address, port){
@@ -50,21 +57,15 @@ class Client{
         })
     }
 
-    discoveryHandler(message,remote){
-        // chack if we already encountered this remote server befor
-        // if yes then it must be stored in 'founPeers' list
+    #discoveryHandler(remote_peer){
+        // chack if we already encountered this  server befor
+        // if no then it must be stored in 'foundPeers' list
         // we can get it using 'getClient' Method
-        // if we did not encounter it befor the this wil return 'undefined'
-        const isRemoteRecognized = this.getClient(remote.address, remote.port)
 
-        // store the relevant information about this server for later use
-        const remote_peer = {
-            'id': message.body.id,
-            'name': message.body.name,
-            'address': remote.address,
-            'port': remote.port
-        }
-                
+        // if we did not encounter it befor the this will return 'undefined'
+        const isRemoteRecognized = this.getClient(remote_peer.address, remote_peer.port)
+
+
         //echo ping only when visible
         if(this.visible){
             let reply = {
@@ -88,15 +89,8 @@ class Client{
         }
     }
 
-    getPeerById(id){
-        return this.foundPeers.find((client)=>{
-            if(id == client.id)
-                return true
-        })
-    }
-
     Start(){
-        this.UdpClient.on('message', async (message, remote)=>{
+        this.UdpClient.on('message', (message, remote)=>{
 
 
             // convert message to JOSN
@@ -105,18 +99,23 @@ class Client{
             // if message header is "__Ping"
             // this means server is loking for us
             if(message.header == "__Ping"){
+                // store the relevant information about this server for later use
+                const remote_peer = {
+                    'id': message.body.id,
+                    'name': message.body.name,
+                    'address': remote.address,
+                    'port': remote.port
+                }
 
-                this.discoveryHandler(message, remote)
+            this.EventBus.emit('#peer-ping', remote_peer)
 
             // if remote is sending something other than "__Ping"
-            }else if(message.header == "__CONNECT"){
-                let permission = await this.onTcpConnectionRequest(message.body)
-                if(permission){
-                    this.ConnectToPeer(message.body.id)
-                }else{
-                    if(onTcpRefusedConnection)
-                        this.onTcpRefusedConnection()
-                }
+            }else if(message.header == "__Connect"){
+                this.EventBus.emit('connection-request', ...message.body)
+
+            }
+            else if(message.header == "__Data"){
+                this.EventBus.emmit('udp-data')
             }
 
         })
@@ -124,42 +123,11 @@ class Client{
         return this
     }
 
-    setTcpDataHandler(onTcpDataCallback){
-        this.onTcpDataCallback = onTcpDataCallback
-        return this
-    }
-
-    setTcpEndHandler(onTcpEndCallback){
-        this.onTcpEndCallback = onTcpEndCallback
-        return this
-    }
-
-    setTcpErrorHandler(onTcpErrorCallback){
-        this.onTcpErrorCallback = onTcpErrorCallback
-        return this
-    }
-    
-    setNewTcpConnectionHandler(onNewTcpConnection){
-        this.onNewTcpConnection = onNewTcpConnection
-        return this
-    }
-
-    setTcpConnectionRequestHandler(onTcpConnectionRequest){
-        this.onTcpConnectionRequest = onTcpConnectionRequest
-    }
-
-    getPeer(host, port){
-        return this.Peers.find((peer)=>{
-            if(peer.host == host && peer.port == port)
-                return peer
-        })
-    }
 
     ConnectToPeer(id){
-        let peer = this.getPeerById(id)
+        let peer = this.getServerById(id)
         if(!peer){
-            console.log('Peer is not recognized')
-            return
+            throw 'Peer is not recognized'
         }
 
         let options = {
@@ -167,14 +135,7 @@ class Client{
             'port': peer.port
         }
 
-        var tcpClient = {
-            id: null,
-            name: null,
-            address: null,
-            port: null,
-            ref: null
-        }
-        // Create TCP client.
+       // Create TCP client.
         var client = net.createConnection(options, ()=>{
             let info = {
                 'localAdress': client.localAddress,
@@ -182,24 +143,21 @@ class Client{
                 'name': peer.name,
                 'id': peer.id
             }
-            var address_temp = client.remoteAddress.split(':')
-            tcpClient.address = address_temp
-            tcpClient.port = address_temp[1]
-            tcpClient.name = peer.name
-            tcpClient.id = peer.id
-            tcpClient.ref = client
-            this.Servers.addPeer(tcpClient)
-            this.onNewTcpConnection(info)
+            this.EventBus.emit('tcp-connected', info)
         })
         //client.setTimeout(1000)
 
         client.setEncoding('utf8')
 
         // When receive server send back data.
-        client.on('data', this.onTcpDataCallback)
+        client.on('data', (data)=>{
+            this.EventBus.emit('tcp-data', data)
+        })
 
         // When connection disconnected.
-        client.on('end', this.onTcpEndCallback)
+        client.on('end', ()=>{
+            this.EventBus.emit('tcp-end')
+        })
 
         /*
         client.on('timeout', function () {
@@ -207,14 +165,21 @@ class Client{
         })
         */
 
-        client.on('error', this.onTcpErrorCallback)
+        client.on('error', ()=>{
+            this.EventBus.emit('tcp-error', error)
+        })
 
-    }
-    
-    destroyConnection(id, onConnectionDestroyed){
-        let client = this.Servers.getPeerById(id)
-        client.ref.destroy()
-        onConnectionDestroyed(client)
+        var address_temp = client.remoteAddress.split(':')
+
+        var tcpClient = {
+            'id' : peer.id
+            'name' : peer.name
+            'address' : address_temp
+            'port' : address_temp[1]
+            'ref' : client
+        }
+        this.Servers.addPeer(tcpClient)
+
     }
 }
 
