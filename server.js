@@ -1,6 +1,7 @@
 import broadcastAddress from 'broadcast-address'
 import dgram from 'dgram'
 import net from 'net'
+import PeersManager from './PeersManager.js'
 import EventEmitter from 'events'
 
 class Server{
@@ -94,7 +95,7 @@ class Server{
     if (!this.eventsList.includes(event)){
       throw 'event does not exist'
     }else{
-      this.EventBus.addEventListener(event, callback)
+      this.EventBus.addListener(event, callback)
     }
   }
   
@@ -117,7 +118,9 @@ class Server{
     })
   }
 
-  #discovery_handler(remote_peer){
+  // using an arrow function to keep 'this' pointing at this class
+  // when calling this function on '#peer-ping' Event
+  #discovery_handler = (remote_peer)=>{
     const isRemoteRecognized = this.getClientByAddress(remote_peer.address, remote_peer.port)
     if(!isRemoteRecognized){
       this.foundPeers.push(remote_peer)
@@ -196,8 +199,8 @@ class Server{
     message = Buffer.from(JSON.stringify(message))
 
     this.UdpSend(message, peer.port, peer.address)
-    checkAcceptenceInterval = clearInterval()
 
+  }
 }
 
 

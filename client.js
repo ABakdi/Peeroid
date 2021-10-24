@@ -32,11 +32,14 @@ class Client{
 
         this.EventBus = EventBus
 
+        this.eventsList = ['tcp-data', 'tcp-end','tcp-error', 'tcp-connected',
+                           'udp-data', 'connection-request']
+
         this.UdpClient = dgram.createSocket('udp4')
 
         this.foundPeers = []
 
-        this.EventBus.on('#peer-ping', this#discoveryHandler)
+        this.EventBus.on('#peer-ping', this.#discoveryHandler)
     }
 
     setVisible(visible){
@@ -50,20 +53,21 @@ class Client{
         })
     }
 
-    getClient(address, port){
+    getServerByAddress(address, port){
         return this.foundPeers.find((server)=>{
             if(address == server.address && port == server.port)
                 return true
         })
     }
 
-    #discoveryHandler(remote_peer){
+    // using an arrow function to keep 'this' pointing at this class
+    // when calling this function on '#peer-ping' Event
+    #discoveryHandler = (remote_peer)=>{
         // chack if we already encountered this  server befor
         // if no then it must be stored in 'foundPeers' list
-        // we can get it using 'getClient' Method
 
         // if we did not encounter it befor the this will return 'undefined'
-        const isRemoteRecognized = this.getClient(remote_peer.address, remote_peer.port)
+        const isRemoteRecognized = this.getServerByAddress(remote_peer.address, remote_peer.port)
 
 
         //echo ping only when visible
@@ -111,7 +115,7 @@ class Client{
 
             // if remote is sending something other than "__Ping"
             }else if(message.header == "__Connect"){
-                this.EventBus.emit('connection-request', ...message.body)
+                this.EventBus.emit('connection-request', message.body.id, message.body.name)
 
             }
             else if(message.header == "__Data"){
@@ -121,6 +125,14 @@ class Client{
         })
         this.UdpClient.bind(6562)
         return this
+    }
+
+    addEventListener(event, callback){
+        if(!this.eventsList.includes(event)){
+            throw 'event does not exist: '+event
+        }
+
+        this.EventBus.addListener(event, callback)
     }
 
 
@@ -140,9 +152,22 @@ class Client{
             let info = {
                 'localAdress': client.localAddress,
                 'remoteAddress': client.remoteAddress,
+                'localPort': client.localPort,
+                'remotePort': client.remotePort,
                 'name': peer.name,
                 'id': peer.id
             }
+            var address_temp = client.remoteAddress
+
+            var tcpClient = {
+                'id' : peer.id,
+                'name' : peer.name,
+                'address' : address_temp,
+                'port' : address_temp,
+                'ref' : client
+            }
+            this.Servers.addPeer(tcpClient)
+
             this.EventBus.emit('tcp-connected', info)
         })
         //client.setTimeout(1000)
@@ -169,16 +194,6 @@ class Client{
             this.EventBus.emit('tcp-error', error)
         })
 
-        var address_temp = client.remoteAddress.split(':')
-
-        var tcpClient = {
-            'id' : peer.id
-            'name' : peer.name
-            'address' : address_temp
-            'port' : address_temp[1]
-            'ref' : client
-        }
-        this.Servers.addPeer(tcpClient)
 
     }
 }
