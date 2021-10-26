@@ -44,14 +44,15 @@ class Server{
       // use utf encodeing for messaging
       tcp_client.setEncoding('utf-8')
 
-      // emit 'tcp-client' with the relevant information
-      this.EventBus.emit('tcp-client', tcp_client)
 
       let TcpClient = {
-        ...this.getClientByAddress(tcp_client.remoteAddress, tcp_client.port),
+        ...this.getClientByAddress(tcp_client.remoteAddress, tcp_client.remotePort),
         ref: tcp_client
       }
 
+      // emit 'tcp-client' with the relevant information
+      this.EventBus.emit('tcp-client', {'address':tcp_client.remoteAddress, 'port':tcp_client.remotePort})
+      
       TcpClient.ref.on('data',(data)=>{
         this.EventBus.emit('tcp-data', data)
       })
@@ -145,8 +146,8 @@ class Server{
 
         this.EventBus.emit('#peer-echo', remote_peer)
 
-      }else if(message.header == '__ACCCEPT'){
-        this.EventBus.emit('peer-accept', message.body.answer, message.body.id)
+      }else if(message.header == '__Accept'){
+        this.EventBus.emit('peer-accept', message.body.id, message.body.answer)
       }else if(message.header =='__Data'){
         this.EventBus.emit('udp-data', ...message.body)
       }

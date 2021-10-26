@@ -36,9 +36,15 @@ title: Client
     if the header is "__Ping" it calls [discoveryHandler](#discoveryHandler).
      
      **Emited events**: ```connection-request```, ```udp-data```
-      
+       
+  3. UdpSend:
+  sends message to a specific address:port using the udp socket
+  ```javascript
+  UdpSend(message, Port, Address, onSendCallback)
+  ```
 
-  3. Connect to peer:
+
+  4. Connect to peer:
     takes an id, if this server is recognized it will try to connect to it using tcp,
 
       **Emited events**: ```tcp-connected```, ```tcp-data```, ```tcp-end```, ```tcp-error```

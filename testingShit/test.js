@@ -1,60 +1,21 @@
-import Server from '../server.js'
-import Client from '../client.js'
-
-const client = new Client("client")
-const server = new Server("server")
-
-client.setTcpDataHandler(function(data){
-    console.log(data)
-})
-
-client.setTcpEndHandler(function(){
-    console.log('connection endded')
-})
-
-client.setTcpErrorHandler(function(err){
-    console.log(err)
-})
+import terminal from 'terminal-kit';
+const {terminal: term} = terminal;
 
 
+function question() {
+  term( 'Do you like javascript? [Y|n]\n' ) ;
+  return new Promise(resolve =>{
+    term.yesOrNo( { yes: [ 'y' , 'ENTER' ] , no: [ 'n' ] } , function h( error , result ) {
+      if ( result ) {
+        term.green( "'Yes' detected! Good bye!\n" ) ;
+        resolve(result)
+        term.grabInput( false )
+      }else {
+        term.red( "'No' detected, are you sure?\n" ) ;
+      }
+    });
+  })
+}
 
-
-server.setNewTcpClientHandler(function(client){
-  console.log('new Tcp Client:', client)
-})
-
-server.setServerCloseHandler(function(){
-  console.log("server closed")
-})
-
-server.setServerErrorHandler(function(error){
-  console.log('Error: ', error)
-})
-
-server.setTcpDataHandler(function(data){
-  console.log("recived: ", data)
-})
-
-server.setTcpEndHandler(function(){
-  console.log('client disconnect')
-})
-
-
-client.Start()
-server.Start()
-
-server.Search(6562, function(obj){
-  console.log('found peer')
-})
-
-setTimeout(()=>server.stopSearching(), 15000)
-
-
-setTimeout(()=>{
-    var host = client.foundPeers[0].address,
-        port = client.foundPeers[0].port
-    console.log(host, port)
-    client.ConnectToPeer(host, port)
-}, 20000)
-
-
+await question() ;
+console.log('I am Out')

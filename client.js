@@ -135,6 +135,33 @@ class Client{
         this.EventBus.addListener(event, callback)
     }
 
+    UdpSend(message, Port, Address, onSendCallback){
+        message = Buffer.from(message)
+        this.UdpClient.send(message, 0, message.length, Port, Address, onSendCallback)
+    }
+
+    RefuseConnection(id){
+        let peer = this.getServerById(id)
+        if(!peer){
+            throw 'Peer is not recognized'
+        }
+
+        let options = {
+            'host': peer.address,
+            'port': peer.port
+        }
+
+        let msg = {
+            'header': '__Accept',
+            'body':{
+                id: this.id,
+                answer: 'no'
+            }
+        }
+        msg = JSON.stringify(msg)
+
+        this.UdpSend(msg, peer.port, peer.address)
+    }
 
     ConnectToPeer(id){
         let peer = this.getServerById(id)
@@ -147,6 +174,16 @@ class Client{
             'port': peer.port
         }
 
+        let msg = {
+            'header': '__Accept',
+            'body':{
+                id: this.id,
+                answer: 'yes'
+            }
+        }
+        msg = JSON.stringify(msg)
+
+        this.UdpSend(msg, peer.port, peer.address)
        // Create TCP client.
         var client = net.createConnection(options, ()=>{
             let info = {

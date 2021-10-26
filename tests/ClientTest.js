@@ -1,16 +1,34 @@
 import Client from '../client.js'
 import {v4 as uuidv4} from 'uuid'
 import EventEmitter from 'events'
+import terminal from 'terminal-kit';
+const {terminal: term} = terminal;
 
 var EventBus = new EventEmitter()
 const id = uuidv4()
 const name = 'my-client'
 var client = new Client(name, id, EventBus)
 
-client.addEventListener('connection-request', function(id, name){
+function yesOrNoQuestion(id, name, question){
+  term(question)
+  return new Promise(resolve => {
+    term.yesOrNo({yes: ['y', 'ENTER'], no:['n']}, function(error, result){
+      resolve(result)
+      term.grabInput( false )
+    })
+  })
+}
+
+client.addEventListener('connection-request', async function(id, name){
   console.log('connection-request')
-  console.log(id, name)
-  client.ConnectToPeer(id)
+  const question = id + " : " + name + " want's to connect to you:[Y|n]\n"
+  var ans = await yesOrNoQuestion(id, name, question)
+  if(ans){
+    client.ConnectToPeer(id)
+  }else{
+    client.RefuseConnection(id)
+    console.log('Connection refused')
+  }
 })
 
 client.addEventListener('tcp-data', function(data){
