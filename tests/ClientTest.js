@@ -51,6 +51,8 @@ client.addEventListener('tcp-error', function(error){
 client.addEventListener('tcp-connected', function(info){
   console.log('tcp-connected')
   console.log(info)
+  let s = client.Servers
+  console.log(s)
 })
 
 client.addEventListener('udp-data', function(stamp, sequence, data){

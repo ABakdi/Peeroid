@@ -1,4 +1,4 @@
-import dgram from 'dgram'
+import dgram, { Socket } from 'dgram'
 import net from 'net'
 import PeersManager from './PeersManager.js'
 import {v4 as uuidv4} from 'uuid'
@@ -36,6 +36,8 @@ class Client{
                            'udp-data', 'connection-request']
 
         this.UdpClient = dgram.createSocket('udp4')
+        //console.log(this.UdpClient)
+        this.TcpClient = new Socket(this.UdpClient)
 
         this.foundPeers = []
 
@@ -97,7 +99,7 @@ class Client{
         this.UdpClient.on('message', (message, remote)=>{
 
 
-            // convert message to JOSN
+            // convert message to JSON
             message = JSON.parse(message.toString())
 
             // if message header is "__Ping"
@@ -124,6 +126,7 @@ class Client{
 
         })
         this.UdpClient.bind(6562)
+        this.TcpClient = new Socket(this.UdpClient)
         return this
     }
 
@@ -144,11 +147,6 @@ class Client{
         let peer = this.getServerById(id)
         if(!peer){
             throw 'Peer is not recognized'
-        }
-
-        let options = {
-            'host': peer.address,
-            'port': peer.port
         }
 
         let msg = {
@@ -182,10 +180,11 @@ class Client{
             }
         }
         msg = JSON.stringify(msg)
+        console.log(options)
 
         this.UdpSend(msg, peer.port, peer.address)
        // Create TCP client.
-        var client = net.createConnection(options, ()=>{
+        var client = net.connect(options, ()=>{
             let info = {
                 'localAdress': client.localAddress,
                 'remoteAddress': client.remoteAddress,
@@ -199,8 +198,8 @@ class Client{
             var tcpClient = {
                 'id' : peer.id,
                 'name' : peer.name,
-                'address' : address_temp,
-                'port' : address_temp,
+                'address' : client.remoteAddress,
+                'port' : client.remotePort,
                 'ref' : client
             }
             this.Servers.addPeer(tcpClient)

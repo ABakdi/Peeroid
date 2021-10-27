@@ -12,6 +12,11 @@ var server = new Server(name, id, EventBus)
 server.addEventListener('tcp-client', function(tcp_client){
   console.log('tcp-client')
   console.log(tcp_client)
+  let fp = server.foundPeers
+  console.log('found peers', fp)
+  //let c = server.Clients
+  //console.log(c)
+
 })
 
 server.addEventListener('tcp-data', function(data){
@@ -39,7 +44,7 @@ server.addEventListener('tcp-error', function(error){
 
 
 server.addEventListener('found-peer', function(remote_peer){
-  console.log('tcp-peer')
+  console.log('found-peer')
   console.log(remote_peer)
 
   console.log('trying to connect to: ', remote_peer.name)
@@ -56,8 +61,6 @@ server.addEventListener('peer-accept', function(id, answer){
   console.log('tcp-accept')
   if(answer == 'yes'){
     console.log('connection accepted')
-    let c = server.Clients
-    console.log(c)
   }else{
     console.log('connection refused')
   }

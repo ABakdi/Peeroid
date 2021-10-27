@@ -36,33 +36,41 @@ class Server{
     // internal events #peer-echo is handled by discovery_handler method
     this.EventBus.on('#peer-echo', this.#discovery_handler)
 
-    this.TcpServer = net.createServer((tcp_client)=>{
+    this.TcpServer = net.createServer((client)=>{
       // all the code in here will be excuted when
       // new tcp client connects to to this server
       // infromation related to the client are in tcp_client
 
       // use utf encodeing for messaging
-      tcp_client.setEncoding('utf-8')
+      client.setEncoding('utf-8')
 
+      //remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
+      // we are only intrested in tha part that i put in prakets,
+      // tha last part, it is th ipv4 address
+      let address = client.remoteAddress.split(':')
+      address = address[address.length -1]
 
+      let c = this.getClientByAddress(address, client.remotePort)
+      console.log('remote: ', address, client.localPort)
       let TcpClient = {
-        ...this.getClientByAddress(tcp_client.remoteAddress, tcp_client.remotePort),
-        ref: tcp_client
+        ...c,
+        ref: client
       }
 
+      this.Clients.addPeer(TcpClient)
+
       // emit 'tcp-client' with the relevant information
-      this.EventBus.emit('tcp-client', {'address':tcp_client.remoteAddress, 'port':tcp_client.remotePort})
+      this.EventBus.emit('tcp-client', TcpClient)
       
-      TcpClient.ref.on('data',(data)=>{
+      client.on('data',(data)=>{
         this.EventBus.emit('tcp-data', data)
       })
 
-      TcpClient.ref.on('end', ()=>{
+      client.on('end', ()=>{
         this.EventBus.emit('tcp-end')
       })
 
 
-      this.Clients.addPeer(TcpClient)
 
     })
 
@@ -143,6 +151,7 @@ class Server{
           'address': remote.address,
           'port': remote.port
         }
+
 
         this.EventBus.emit('#peer-echo', remote_peer)
 
