@@ -31,59 +31,69 @@ class Server{
     // remote peer found when serched for
     this.foundPeers = []
 
-    this.UdpServer = dgram.createSocket('udp4')
+    this.UdpServer = dgram.createSocket({type:'udp4', reuseAddr: true})
+    this.TcpServer = null
 
     // internal events #peer-echo is handled by discovery_handler method
     this.EventBus.on('#peer-echo', this.#discovery_handler)
 
-    this.TcpServer = net.createServer((client)=>{
-      // all the code in here will be excuted when
-      // new tcp client connects to to this server
-      // infromation related to the client are in tcp_client
-
-      // use utf encodeing for messaging
-      client.setEncoding('utf-8')
-
-      //remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
-      // we are only intrested in tha part that i put in prakets,
-      // tha last part, it is th ipv4 address
-      let address = client.remoteAddress.split(':')
-      address = address[address.length -1]
-
-      let c = this.getClientByAddress(address, client.remotePort)
-      console.log('remote: ', address, client.localPort)
-      let TcpClient = {
-        ...c,
-        ref: client
-      }
-
-      this.Clients.addPeer(TcpClient)
-
-      // emit 'tcp-client' with the relevant information
-      this.EventBus.emit('tcp-client', TcpClient)
-      
-      client.on('data',(data)=>{
-        this.EventBus.emit('tcp-data', data)
-      })
-
-      client.on('end', ()=>{
-        this.EventBus.emit('tcp-end')
-      })
-
-
-
-    })
 
   }
   //bind Udp and listen to tcp requests on the same port
   Start(){
     this.UdpServer.bind(()=>{
+      let add = this.UdpServer.address()
+      console.log(add)
+      this.TcpServer = net.createServer({'host': add.address, 'port': add.port}, (client)=>{
+        // all the code in here will be excuted when
+        // new tcp client connects to to this server
+        // infromation related to the client are in tcp_client
+
+        // use utf encodeing for messaging
+        client.setEncoding('utf-8')
+
+        //remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
+        // we are only intrested in tha part that i put in prakets,
+        // tha last part, it is th ipv4 address
+        let address = client.remoteAddress.split(':')
+        address = address[address.length -1]
+        let remote_client = {
+          'remoteAddress': client.remoteAddress,
+          'remotePort': client.remotePort,
+          'localAddress': client.localAddress,
+          'localPort': client.localPort
+        }
+
+        let c = this.getClientByAddress(address, 6562)
+        console.log('remote_client: ', remote_client)
+        let TcpClient = {
+          ...c,
+          ref: client
+        }
+        //TcpClient.port = client.localPort
+
+        this.Clients.addPeer(TcpClient)
+
+        // emit 'tcp-client' with the relevant information
+        this.EventBus.emit('tcp-client', TcpClient)
+
+        client.on('data',(data)=>{
+          this.EventBus.emit('tcp-data', data)
+        })
+
+        client.on('end', ()=>{
+          this.EventBus.emit('tcp-end')
+        })
+
+
+
+      })
 
       // make this udp socket able to brodcast
       this.UdpServer.setBroadcast(true)
 
       //udp and tcp servers will bind to the same port
-      const server_port = this.UdpServer.address().port
+      const server_port = add.port
 
       this.TcpServer.listen(server_port, ()=>{
 
@@ -149,13 +159,13 @@ class Server{
           'id': message.body.id,
           'name': message.body.name,
           'address': remote.address,
-          'port': remote.port
+          'port': remote.port,
         }
-
 
         this.EventBus.emit('#peer-echo', remote_peer)
 
       }else if(message.header == '__Accept'){
+        console.log(message)
         this.EventBus.emit('peer-accept', message.body.id, message.body.answer)
       }else if(message.header =='__Data'){
         this.EventBus.emit('udp-data', ...message.body)
@@ -168,24 +178,23 @@ class Server{
 
     const BROADCAST_ADDR = broadcastAddress('wlan0')
     const PORT = port
-
+    console.log(this.TcpServer)
     const broadcastPresence = ()=>{
       let message = {
         'header': "__Ping",
         'body':{
           'id': this.id,
-          'name': this.name
+          'name': this.name,
         }
       }
       message = Buffer.from(JSON.stringify(message))
-      this.UdpSend(message, PORT, BROADCAST_ADDR)
+      this.UdpSend(message, port, BROADCAST_ADDR)
+
     }
 
     clearInterval(this.UdpBroadcast)
 
     this.UdpBroadcast = setInterval(broadcastPresence, interval*1000)
-
-
   }
 
   stopSearching(){
@@ -217,39 +226,3 @@ class Server{
 
 
 export default Server
-/*
-const server = new Server("server")
-
-server.setNewTcpClientHandler(function(client){
-  console.log('new Tcp Client:', client)
-})
-
-server.setServerCloseHandler(function(){
-  console.log("server closed")
-})
-
-server.setServerErrorHandler(function(error){
-  console.log('Error: ', error)
-})
-
-server.setTcpDataHandler(function(data){
-  console.log("recived: ", data)
-})
-
-server.setTcpEndHandler(function(){
-  console.log('client disconnect')
-})
-
-server.Start()
-
-server.Search(6562, function(obj){
-  console.log('found peer')
-})
-
-setTimeout(()=>{
-  server.stopSearching()
-  console.log(server.foundPeers)
-  var id = server.foundPeers[0].id
-  server.ConnectToPeer(id)
-}, 9000)
-*/

@@ -11,11 +11,11 @@ var server = new Server(name, id, EventBus)
 
 server.addEventListener('tcp-client', function(tcp_client){
   console.log('tcp-client')
-  console.log(tcp_client)
+  //console.log(tcp_client)
   let fp = server.foundPeers
   console.log('found peers', fp)
-  //let c = server.Clients
-  //console.log(c)
+  let c = server.Clients
+  console.log(c)
 
 })
 

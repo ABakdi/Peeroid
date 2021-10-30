@@ -35,9 +35,7 @@ class Client{
         this.eventsList = ['tcp-data', 'tcp-end','tcp-error', 'tcp-connected',
                            'udp-data', 'connection-request']
 
-        this.UdpClient = dgram.createSocket('udp4')
-        //console.log(this.UdpClient)
-        this.TcpClient = new Socket(this.UdpClient)
+        this.UdpClient = dgram.createSocket({type:'udp4', reuseAddr: true})
 
         this.foundPeers = []
 
@@ -78,14 +76,14 @@ class Client{
                 'header': "__Echo",
                 'body': {
                     'id': this.id,
-                    'name': this.name
+                    'name': this.name,
                 }
             }
                     
             // convert reply ro buffer
             reply = Buffer.from(JSON.stringify(reply))
-                    
-            this.UdpClient.send(reply, 0, reply.length,remote_peer.port, remote_peer.address)
+
+            this.UdpClient.send(reply, 0, reply.length, remote_peer.port, remote_peer.address)
             if(!isRemoteRecognized){
                 // if the remote peer is new
                 // add it to the list of Peers
@@ -110,10 +108,10 @@ class Client{
                     'id': message.body.id,
                     'name': message.body.name,
                     'address': remote.address,
-                    'port': remote.port
+                    'port': remote.port,
                 }
 
-            this.EventBus.emit('#peer-ping', remote_peer)
+                this.EventBus.emit('#peer-ping', remote_peer)
 
             // if remote is sending something other than "__Ping"
             }else if(message.header == "__Connect"){
@@ -123,10 +121,8 @@ class Client{
             else if(message.header == "__Data"){
                 this.EventBus.emmit('udp-data')
             }
-
         })
         this.UdpClient.bind(6562)
-        this.TcpClient = new Socket(this.UdpClient)
         return this
     }
 
@@ -176,61 +172,59 @@ class Client{
             'header': '__Accept',
             'body':{
                 id: this.id,
-                answer: 'yes'
+                answer: 'yes',
             }
         }
         msg = JSON.stringify(msg)
-        console.log(options)
+        this.UdpSend(msg, peer.port, peer.address, ()=>{
+            // Create TCP client.
+            var client = net.createConnection(options, ()=>{
 
-        this.UdpSend(msg, peer.port, peer.address)
-       // Create TCP client.
-        var client = net.connect(options, ()=>{
-            let info = {
-                'localAdress': client.localAddress,
-                'remoteAddress': client.remoteAddress,
-                'localPort': client.localPort,
-                'remotePort': client.remotePort,
-                'name': peer.name,
-                'id': peer.id
-            }
-            var address_temp = client.remoteAddress
+                let info = {
+                    'localAdress': client.localAddress,
+                    'remoteAddress': client.remoteAddress,
+                    'localPort': client.localPort,
+                    'remotePort': client.remotePort,
+                    'name': peer.name,
+                    'id': peer.id
+                }
+                var address_temp = client.remoteAddress
 
-            var tcpClient = {
-                'id' : peer.id,
-                'name' : peer.name,
-                'address' : client.remoteAddress,
-                'port' : client.remotePort,
-                'ref' : client
-            }
-            this.Servers.addPeer(tcpClient)
+                var tcpClient = {
+                    'id' : peer.id,
+                    'name' : peer.name,
+                    'address' : client.remoteAddress,
+                    'port' : client.remotePort,
+                    'ref' : client
+                }
+                this.Servers.addPeer(tcpClient)
+                this.EventBus.emit('tcp-connected', info)
+            })
+            //client.setTimeout(1000)
 
-            this.EventBus.emit('tcp-connected', info)
+            client.setEncoding('utf8')
+
+            // When receive server send back data.
+            client.on('data', (data)=>{
+                this.EventBus.emit('tcp-data', data)
+            })
+
+            // When connection disconnected.
+            client.on('end', ()=>{
+                this.EventBus.emit('tcp-end')
+            })
+
+            /*
+            client.on('timeout', function () {
+              console.log('Client connection timeout. ')
+            })
+            */
+
+            client.on('error', ()=>{
+                this.EventBus.emit('tcp-error', error)
+            })
+
         })
-        //client.setTimeout(1000)
-
-        client.setEncoding('utf8')
-
-        // When receive server send back data.
-        client.on('data', (data)=>{
-            this.EventBus.emit('tcp-data', data)
-        })
-
-        // When connection disconnected.
-        client.on('end', ()=>{
-            this.EventBus.emit('tcp-end')
-        })
-
-        /*
-        client.on('timeout', function () {
-            console.log('Client connection timeout. ')
-        })
-        */
-
-        client.on('error', ()=>{
-            this.EventBus.emit('tcp-error', error)
-        })
-
-
     }
 }
 
