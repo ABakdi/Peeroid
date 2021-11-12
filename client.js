@@ -11,7 +11,7 @@ import { error } from 'console'
  */
 class Client{
 
-    constructor(name, id, EventBus, visible=true){
+    constructor(name, id, EventBus, peersManager, visible=true){
 
         if(!name){
             throw "client must have a name"
@@ -22,7 +22,7 @@ class Client{
         }
 
         //contains list of servers we are connected to with Tcp
-        this.Servers = new PeersManager()
+        this.Servers = peersManager
 
         // if true we can be found when searching
         this.visible = visible

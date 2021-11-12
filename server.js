@@ -6,7 +6,7 @@ import EventEmitter from 'events'
 
 class Server{
 
-  constructor(name, id, EventBus){
+  constructor(name, id, EventBus, peersManager){
     if(!name){
       throw "server must have a name"
     }
@@ -26,7 +26,7 @@ class Server{
     this.UdpBroadcast = null
 
     //this will store a list of clients
-    this.Clients = new PeersManager()
+    this.Clients = peersManager
 
     // remote peer found when serched for
     this.foundPeers = []
@@ -53,7 +53,7 @@ class Server{
         client.setEncoding('utf-8')
 
         //remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
-        // we are only intrested in tha part that i put in prakets,
+        // we are only intrested in tha part that I put in prakets,
         // tha last part, it is th ipv4 address
         let address = client.remoteAddress.split(':')
         address = address[address.length -1]
@@ -176,7 +176,7 @@ class Server{
 
   Search(port, interval = 3){
 
-    const BROADCAST_ADDR = broadcastAddress('wlan0')
+    const BROADCAST_ADDR = broadcastAddress('wlp3s0')
     const PORT = port
     console.log(this.TcpServer)
     const broadcastPresence = ()=>{
