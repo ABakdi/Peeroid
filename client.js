@@ -93,7 +93,7 @@ class Client{
         }
     }
 
-    Start(){
+    Start(port){
         this.UdpClient.on('message', (message, remote)=>{
 
 
@@ -102,7 +102,7 @@ class Client{
 
             // if message header is "__Ping"
             // this means server is loking for us
-            if(message.header == "__Ping"){
+            if(message.header == "__Ping" && message.body.id != this.id){
                 // store the relevant information about this server for later use
                 const remote_peer = {
                     'id': message.body.id,
@@ -110,7 +110,6 @@ class Client{
                     'address': remote.address,
                     'port': remote.port,
                 }
-
                 this.EventBus.emit('#peer-ping', remote_peer)
 
             // if remote is sending something other than "__Ping"
@@ -122,8 +121,7 @@ class Client{
                 this.EventBus.emmit('udp-data')
             }
         })
-        this.UdpClient.bind(6562)
-        return this
+        this.UdpClient.bind(port)
     }
 
     addEventListener(event, callback){

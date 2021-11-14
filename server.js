@@ -153,7 +153,7 @@ class Server{
 
       message = JSON.parse(message.toString())
 
-      if(message.header == "__Echo"){
+      if(message.header == "__Echo" && message.body.id != this.id){
 
         const remote_peer = {
           'id': message.body.id,
@@ -162,7 +162,10 @@ class Server{
           'port': remote.port,
         }
 
-        this.EventBus.emit('#peer-echo', remote_peer)
+        // avoid ping requests from my self
+        if(message.body.id != this.id){
+          this.EventBus.emit('#peer-echo', remote_peer)
+        }
 
       }else if(message.header == '__Accept'){
         console.log(message)
@@ -178,17 +181,18 @@ class Server{
 
     const BROADCAST_ADDR = broadcastAddress('wlp3s0')
     const PORT = port
-    console.log(this.TcpServer)
-    const broadcastPresence = ()=>{
-      let message = {
+    let message = {
         'header': "__Ping",
         'body':{
           'id': this.id,
           'name': this.name,
         }
       }
-      message = Buffer.from(JSON.stringify(message))
-      this.UdpSend(message, port, BROADCAST_ADDR)
+    message = Buffer.from(JSON.stringify(message))
+    const broadcastPresence = ()=>{
+      PORT.forEach((prt)=>{
+        this.UdpSend(message, prt, BROADCAST_ADDR)
+      })
 
     }
 

@@ -2,7 +2,6 @@ import Client from '../client.js'
 import {v4 as uuidv4} from 'uuid'
 import EventEmitter from 'events'
 import terminal from 'terminal-kit';
-import { resolve } from 'dns';
 const {terminal: term} = terminal;
 
 var EventBus = new EventEmitter()
