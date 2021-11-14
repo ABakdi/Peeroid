@@ -5,7 +5,6 @@ import PeersManager from './PeersManager.js'
 import EventEmitter from 'events'
 
 class Server{
-
   constructor(name, id, EventBus, peersManager){
     if(!name){
       throw "server must have a name"
@@ -181,17 +180,18 @@ class Server{
 
     const BROADCAST_ADDR = broadcastAddress('wlp3s0')
     const PORT = port
-    let message = {
+    console.log(this.TcpServer)
+    const broadcastPresence = ()=>{
+      let message = {
         'header': "__Ping",
         'body':{
           'id': this.id,
           'name': this.name,
         }
       }
-    message = Buffer.from(JSON.stringify(message))
-    const broadcastPresence = ()=>{
-      PORT.forEach((prt)=>{
-        this.UdpSend(message, prt, BROADCAST_ADDR)
+      PORT.forEach((port)=>{
+        message = Buffer.from(JSON.stringify(message))
+        this.UdpSend(message, port, BROADCAST_ADDR)
       })
 
     }

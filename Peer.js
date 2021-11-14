@@ -1,201 +1,217 @@
-import Client from './client.js'
-import Server from './server.js'
+import dgram from 'dgram'
+import net from 'net'
 import PeersManager from './PeersManager.js'
 import {v4 as uuidv4} from 'uuid'
 import EventEmitter from 'events'
-import terminal from 'terminal-kit';
-const {terminal: term} = terminal;
-
-
-function input(){
-  var cursorIndex = -1
-  let INPUT = ""
-  // handle deleting charecters with backspace
-  const delete_handler = function(){
-    //prevent more deletion if INPUT is empty
-    // or cursor is at the beginning
-    if(INPUT == '' || cursorIndex <= -1)
-        return
-    INPUT= INPUT.substr(0 ,cursorIndex) + INPUT.substr(cursorIndex + 1)
-    term.left(1)
-    term.delete(1)
-    cursorIndex = cursorIndex - 1
-  }
-  const terminate = function(resolve){
-    term.grabInput(false)
-    resolve(INPUT)
-  }
-  term.grabInput()
-  return new Promise((resolve)=>{
-    term.on('key', function(key, matches, data){
-      switch(key){
-        case 'UP':
-          break
-        case 'DOWN':
-          break
-        case 'RIGHT':
-          cursorIndex = cursorIndex + 1
-          term.right(1);
-          break
-        case 'LEFT':
-          cursorIndex = cursorIndex - 1
-          term.left(1)
-          break
-        case 'CTRL_C':
-          term('\n')
-          process.exit()
-
-        case 'BACKSPACE':
-          delete_handler()
-          break
-
-        case 'ENTER':
-          term('\n')
-          terminate(resolve)
-        default:
-          let char = Buffer.isBuffer(data.code) ? data.code : String.fromCharCode(data.code)
-          cursorIndex = cursorIndex +1
-          INPUT = INPUT + char
-          term.green(char)
-      }
-    })
-  })
-}
-
-function yesOrNoQuestion(id, name, question){
-  term(question)
-  return new Promise(resolve => {
-    term.yesOrNo({yes: ['y', 'ENTER'], no:['n']}, function(error, result){
-      resolve(result)
-      term.grabInput( false )
-    })
-  })
-}
 class Peer{
   constructor(name){
     this.id = uuidv4()
     this.name = name
     this.Peers = new PeersManager()
     this.EventBus = new EventEmitter()
-    this.Client = new Client(this.name, this.id, this.EventBus, this.Peers)
-    this.Server = new Server(this.name, this.id, this.EventBus, this.Peers)
-
-    //Server configs
-    this.Server.addEventListener('tcp-client', function(tcp_client){
-      console.log('tcp-client')
-      console.log(tcp_client)
-    })
-
-    this.Server.addEventListener('tcp-data', function(data){
-        console.log('tcp-data')
-        console.log(data)
-    })
-
-
-    this.Server.addEventListener('tcp-end', function(){
-        console.log('tcp-end')
-        console.log('connection ended')
-    })
-
-
-    this.Server.addEventListener('tcp-close', function(){
-        console.log('tcp-close')
-        console.log('conection closed')
-    })
-
-
-    this.Server.addEventListener('tcp-error', function(error){
-        console.log('tcp-error')
-        console.log('Error: ', error)
-    })
-
-
-    this.Server.addEventListener('found-peer', (remote_peer)=>{
-        console.log('found-peer')
-        console.log(remote_peer)
-
-        console.log('trying to connect to: ', remote_peer.name)
-        var id = remote_peer.id
-        this.Connect(id)
-    })
-
-    this.Server.addEventListener('udp-data', function(stamp, sequence, data){
-        console.log('tcp-data')
-        console.log(stamp, sequence, data)
-    })
-
-    this.Server.addEventListener('peer-accept', function(id, answer){
-        console.log('tcp-accept')
-        if(answer == 'yes'){
-            console.log('connection accepted')
-        }else{
-            console.log('connection refused')
-        }
-    })
-
-
-    //client configs
-
-    this.Client.addEventListener('connection-request', async (id, name)=>{
-        console.log('connection-request')
-        const question = id + " : " + name + " want's to connect to you:[Y|n]\n"
-        var ans = await yesOrNoQuestion(id, name, question)
-        if(ans){
-          this.Client.ConnectToPeer(id)
-        }else{
-          this.Client.RefuseConnection(id)
-            console.log('Connection refused')
-        }
-    })
-
-    this.Client.addEventListener('tcp-data', function(data){
-        console.log('tcp-data')
-        console.log(data)
-    })
-
-
-    this.Client.addEventListener('tcp-end', function(){
-        console.log('tcp-end')
-        console.log('connection ended')
-    })
-
-
-    this.Client.addEventListener('tcp-error', function(error){
-        console.log('tcp-error')
-        console.log('Error: ' + error)
-    })
-
-    this.Client.addEventListener('tcp-connected', async (info)=>{
-        console.log('tcp-connected')
-        console.log(info)
-        let s = this.Client.Servers
-        console.log(s)
-        term.green('\n>>> ')
-        let msg = await input()
-        s.peers[0].ref.write(msg)
-    })
-
-    this.Client.addEventListener('udp-data', function(stamp, sequence, data){
-        console.log('udp-data')
-        console.log(stamp, sequence, data)
-    })
-
-
+    this.foundPeers = []
+    this.UdpSocket = dgram.createSocket({type:'udp4', reuseAddr: true})
+    this.TcpServer = null
 
   }
 
-  Start(port){
-    this.Server.Start()
-    this.Client.Start(port)
+  Start(){
+    let Port = port
+    this.UdpSocket.bind(Port,()=>{
+      let add = this.UdpSocket.address()
+
+      // Log
+      console.log(add)
+
+      this.TcpServer = net.createServer({'host': add.address, 'port': add.port}, (client)=>{
+        // all the code in here will be excuted when
+        // new tcp client connects to to this server
+        // infromation related to the client are in tcp_client
+
+        // use utf-8 encodeing for messaging
+        client.setEncoding('utf-8')
+
+        // Note: this is just a quick fix, I couldn't find any other way.
+        //remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
+        // we are only intrested in tha part that I put in prakets,
+        // tha last part, it is the ipv4 address
+        let address = client.remoteAddress.split(':')
+        address = address[address.length -1]
+
+        let remote_client = {
+          'remoteAddress': client.remoteAddress,
+          'remotePort': client.remotePort,
+          'localAddress': client.localAddress,
+          'localPort': client.localPort
+        }
+
+        let c = this.getClientByAddress(address, Port)
+
+        // Log
+        console.log('remote_client: ', remote_client)
+
+        let TcpClient = {
+          ...c,
+          ref: client
+        }
+
+        this.peers.addPeer(TcpClient)
+
+        // emit 'tcp-client' with the relevant information
+        this.EventBus.emit('tcp-client', TcpClient)
+
+        // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
+        client.on('data',(data)=>{
+          let id = TcpClient.id
+          this.EventBus.emit('tcp-data', id, data)
+        })
+
+        client.on('end', ()=>{
+          this.EventBus.emit('tcp-end')
+        })
+
+
+
+      })
+
+      // make this udp socket able to brodcast
+      this.UdpSocket.setBroadcast(true)
+
+      //udp and tcp servers will bind to the same port
+      const server_port = add.port
+
+      this.TcpServer.listen(server_port, ()=>{
+
+        this.TcpServer.on('close', ()=>{
+          this.EventBus.emit('tcp-close')
+        })
+
+        this.TcpServer.on('error', (error)=>{
+          this.EventBus.emit('tcp-error', error)
+        })
+      })
+
+    })
+    this.#UdpListen()
 
   }
 
-  Search(port){
-    this.Server.Search(port)
+
+  #UdpListen(){
+    this.UdpSocket.on('message', (message, remote)=>{
+
+      try{
+        message = JSON.parse(message.toString())
+      }catch(err){
+        throw "unable to parse message: "+ err
+      }
+      this.#udpMessageHandler(message)
+    })
+
+  }
+
+  #udpMessageHandler(message){
+    switch(message.header){
+      case "__Ping":
+        if(message.body.id == this.id)
+          break
+        // store the relevant information about this server for later use
+        const remote_peer = {
+            'id': message.body.id,
+            'name': message.body.name,
+            'address': remote.address,
+            'port': remote.port,
+        }
+        this.EventBus.emit('#peer-ping', remote_peer, true)
+
+      case "__Echo":
+        if(message.body.id == this.id)
+          break
+
+        const remote_peer = {
+          'id': message.body.id,
+          'name': message.body.name,
+          'address': remote.address,
+          'port': remote.port,
+        }
+
+        this.EventBus.emit('#peer-echo', remote_peer, false)
+        break
+
+      case "__Connect":
+        this.EventBus.emit('connection-request', message.body.id, message.body.name)
+        break
+
+      case "__Accept":
+        console.log(message)
+        this.EventBus.emit('peer-accept', message.body.id, message.body.answer)
+        break
+
+      case "__Data":
+        this.EventBus.emit('udp-data', ...message.body)
+        break
+    }
+  }
+
+  #discovery_handler = (remote_peer, isping)=>{
+    const isRemoteRecognized = this.getClientByAddress(remote_peer.address, remote_peer.port)
+    if(!isRemoteRecognized){
+      if(isping){
+        this.foundPeers.push(remote_peer)
+        this.EventBus.emit('found-peer', remote_peer)
+      }else{
+
+        if(this.visible){
+          let reply = {
+            'header': "__Echo",
+            'body': {
+              'id': this.id,
+              'name': this.name,
+            }
+          }
+          // convert reply ro buffer
+        reply = Buffer.from(JSON.stringify(reply))
+
+        this.UdpClient.send(reply, 0, reply.length, remote_peer.port, remote_peer.address)
+          this.foundPeers.push(remote_peer)
+        }
+      }
+    }
+  }
+  
+
+  Search(portList, interval = 3){
+    const BROADCAST_ADDR = broadcastAddress('wlp3s0')
+    const PORT = portList
+
+    const broadcastPresence = ()=>{
+      let message = {
+        'header': "__Ping",
+        'body':{
+          'id': this.id,
+          'name': this.name,
+        }
+      }
+
+      PORT.forEach((port)=>{
+        message = Buffer.from(JSON.stringify(message))
+        this.UdpSend(message, port, BROADCAST_ADDR)
+      })
+
+    }
+
+    clearInterval(this.UdpBroadcast)
+
+    this.UdpBroadcast = setInterval(broadcastPresence, interval*1000)
+  }
+  addEventListener(event, callback){
+    if(!this.eventsList.includes(event)){
+      throw 'event does not exist: '+event
+    }
+    this.EventBus.addListener(event, callback)
   }
 
   Connect(id){
-    this.Server.ConnectToPeer(id)
   }
 
   UdpSend(id){
@@ -214,7 +230,6 @@ class Peer{
 
   Kill(id){
     let peer = this.peers.getPeerById(id)
-
   }
 }
 export default Peer
