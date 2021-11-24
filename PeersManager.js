@@ -10,7 +10,8 @@ class PeersManager{
             name: obj.name,
             address: obj.address,
             port: obj.port,
-            ref: obj.ref
+            ref: obj.ref,
+            key: obj.key
         })
 
     }

@@ -20,6 +20,7 @@ class Server{
 
     this.name = name
     this.id = id
+    this.visible = true
     this.EventBus = EventBus
     //reference to broadcast set interval
     this.UdpBroadcast = null
