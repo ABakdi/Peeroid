@@ -25,6 +25,10 @@ class PeersManager{
         return this.peers.filter(c => c.name == name)
     }
 
+    getPeerByAddress(address, port){
+        return this.peers.find(c => c.address == address && c.port == port)
+    }
+
     removePeerById(id){
         let index = this.peers.findIndex(c => c.id == id)
         this.peers.splice(index, 1)

@@ -105,7 +105,12 @@ class Peer{
         // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
         client.on('data',(data)=>{
           let id = TcpClient.id
-          this.EventBus.emit('tcp-data', id, data)
+          data = JSON.parse(data)
+          let key = this.Peers.getPeerById(id).key
+          if(data.header == "__Data"){
+            let dataBody = SymDecrypt(data.body, key)
+            this.EventBus.emit('tcp-data', id, dataBody.data)
+          }
         })
 
         client.on('end', ()=>{
@@ -181,7 +186,26 @@ class Peer{
   }
 
   #udpMessageHandler(message, remote){
+    const decryptBody = (body, found, connected=false)=>{
+      // found specifies which found-peer to search
+      // if connected is true we serch Peers
+      let peer
+
+      if(connected){
+        peer = this.Peers.getPeerByAddress(remote.address, remote.port)
+      }else{
+        peer = this.getFoundpeerByAddress(remote.address, remote.port, found)
+      }
+
+      if(!peer){
+        throw new Error('peer is not recognized')
+      }else{
+        return SymDecrypt(body, peer.key)
+      }
+    }
+
     let remote_peer = null
+    let body
     switch(message.header){
       case "__Ping":
         if(message.body.id == this.id)
@@ -201,7 +225,7 @@ class Peer{
       case "__Echo":
 
         const privateKey = this.#getPrivateKey(message.tail.publicKey)
-        let body = AsymDecrypt(privateKey, message.body)
+        body = AsymDecrypt(privateKey, message.body)
 
         if(body.id == this.id)
           break
@@ -219,15 +243,20 @@ class Peer{
         break
 
       case "__Connect":
-        this.EventBus.emit('connection-request', message.body.id, message.body.name)
+        // found = false, I recived connect meaning peer found me
+        body = decryptBody(message.body, false)
+        this.EventBus.emit('connection-request', body.id, body.name)
         break
 
       case "__Accept":
-        this.EventBus.emit('peer-accept', message.body.id, message.body.answer)
+        // found = true, I recived accept meaning i sent connect to ap peer i found
+        body = decryptBody(message.body, true)
+        this.EventBus.emit('peer-accept', body.id, body.answer)
         break
 
       case "__Data":
-        this.EventBus.emit('udp-data', message.body.id, message.body.data)
+        body = decryptBody(message.body, false, true)
+        this.EventBus.emit('udp-data', body.id, body.data)
         break
     }
   }
@@ -333,6 +362,7 @@ class Peer{
         'name': this.name
       }
     }
+    message.body = SymEncrypt(message.body, peer.key)
 
     message = Buffer.from(JSON.stringify(message))
 
@@ -352,6 +382,7 @@ class Peer{
         answer: 'no'
       }
     }
+    msg.body = SymEncrypt(msg.body, peer.key)
     msg = JSON.stringify(msg)
 
     this.UdpSocket.send(msg, 0, msg.length, peer.port, peer.address)
@@ -376,6 +407,7 @@ class Peer{
         answer: 'yes',
       }
     }
+    msg.body = SymEncrypt(msg.body, peer.key)
     msg = Buffer.from(JSON.stringify(msg))
     this.UdpSocket.send(msg, 0, msg.length, peer.port, peer.address, ()=>{
     // Create TCP client.
@@ -408,7 +440,13 @@ class Peer{
 
     // When receive server send back data.
     client.on('data', (data)=>{
-      this.EventBus.emit('tcp-data', id, data)
+      let id = tcpClient.id
+      data = JSON.parse(data)
+      let key = this.Peers.getPeerById(id).key
+      if(data.header == "__Data"){
+        let dataBody = SymDecrypt(data.body, key)
+        this.EventBus.emit('tcp-data', id, dataBody.data)
+      }
     })
 
     // When connection disconnected.
@@ -438,13 +476,22 @@ class Peer{
         'data': message
       }
     }
+    msg.body = SymEncrypt(msg.body, peer.key)
     msg = Buffer.from(JSON.stringify(msg))
     this.UdpSocket.send(msg, 0, msg.length, peer.port, peer.address)
   }
 
   TcpSend(id, message){
     let peer = this.Peers.getPeerById(id)
-    peer.ref.write(message)
+    let msg = {
+      'header' : "__Data",
+      'body' : {
+        'data': message
+      }
+    }
+    msg.body = SymEncrypt(msg.body, peer.key)
+    msg = JSON.stringify(msg)
+    peer.ref.write(msg)
 
   }
 
