@@ -56,6 +56,44 @@ class Peer{
     else
       throw new Error('key does not exist')
   }
+
+  setVisible(visible){
+      this.visible = visible
+  }
+
+  getFoundpeerById(id, found){
+    let list = []
+    if(found)
+      list = this.foundPeers
+    else
+      list = this.foundMepeers
+
+    return list.find((peer)=>{
+      if(id == peer.id)
+        return true
+    })
+  }
+
+  getFoundpeerByAddress(address, port, found){
+    let list = []
+    if(found)
+      list = this.foundPeers
+    else
+      list = this.foundMepeers
+
+    return list.find((peer)=>{
+      if(address == peer.address && port == peer.port)
+        return true
+    })
+  }
+
+  addEventListener(event, callback){
+    if(!this.eventsList.includes(event)){
+      throw 'event does not exist: '+event
+    }
+    this.EventBus.addListener(event, callback)
+  }
+
   Start(port){
     let Port = port
     if(!Port)
@@ -139,36 +177,6 @@ class Peer{
     this.#UdpListen()
 
   }
-  setVisible(visible){
-      this.visible = visible
-  }
-
-  getFoundpeerById(id, found){
-    let list = []
-    if(found)
-      list = this.foundPeers
-    else
-      list = this.foundMepeers
-
-    return list.find((peer)=>{
-      if(id == peer.id)
-        return true
-    })
-  }
-
-  getFoundpeerByAddress(address, port, found){
-    let list = []
-    if(found)
-      list = this.foundPeers
-    else
-      list = this.foundMepeers
-
-    return list.find((peer)=>{
-      if(address == peer.address && port == peer.port)
-        return true
-    })
-  }
-
 
 
   #UdpListen(){
