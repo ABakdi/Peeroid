@@ -10,13 +10,15 @@ class eventBus{
   // returns a list of events that already exist
   _addEvents(events){
     if(typeof(events) == "string"){
+      if(this.eventList.includes(events))
+        return events
       this.eventList.push(events)
 
     }else if(isArray(events)){
 
       if(events.some(e => typeof(e) != "string"))
         throw new Error('event name must be string')
-      let existent
+      let existent = []
       events.forEach((e)=>{
         if(!this.eventList.includes(e))
           this.eventList.push(e)
@@ -36,7 +38,10 @@ class eventBus{
   // returns events that does not exist in this.eventList
   _removeEvents(events){
     if(typeof(events) == "string"){
-      this.eventList.push(events)
+      let index = this.eventList.indexOf(events)
+      if(index == -1)
+        return events
+      delete this.eventList[index]
 
     }else if(isArray(events)){
 
@@ -84,12 +89,25 @@ class eventBus{
 
   }
 
-  Emmit(events, ...params){
+  Emit(event, ...params){
     if(this.eventList.includes(event))
-      this.Bus.emmit(events, ...params)
+      this.Bus.emit(event, ...params)
     else
       throw new Error('no such event')
   }
 
 }
 //test
+const Bus = new eventBus()
+let events = ['hello', 'world', 'hi']
+Bus._addEvents(events)
+Bus.addEventListener('hello', (who) => console.log('hello', who))
+Bus.addEventListener('world', (who) => console.log('hello', who))
+Bus.addEventListener('hi', (who, jk) => console.log('hello', who, jk))
+Bus.Emit('hello', 'kkkkkk')
+Bus.Emit('world', 'kflkforfjog')
+Bus.Emit('hi', 'Lopf', 'GLFMp')
+let p = Bus._addEvents(['hi', 'll', 'world'])
+console.log(p)
+p = Bus._removeEvents(['hi', 'll', 'lllem'])
+console.log(p)
