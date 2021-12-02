@@ -136,6 +136,3 @@ let enc
 enc = key_store.aSymetricEncrypt(peers[0], stamps[0], msg)
 console.log(enc)
 console.log(key_store.aSymetricDecrypt(peers[0], stamps[0], enc))
-
-//stach
-console.log('jhgjhfg')
