@@ -350,13 +350,6 @@ class Peer{
     this.UdpBroadcast = setTimeout(broadcastPresence, interval*1000)
   }
 
-  addEventListener(event, callback){
-    if(!this.eventsList.includes(event)){
-      throw 'event does not exist: '+event
-    }
-    this.EventBus.addListener(event, callback)
-  }
-
   ConnectionRequest(id){
     let peer = this.getFoundpeerById(id, true)
     if(!peer){
