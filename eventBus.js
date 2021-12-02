@@ -78,10 +78,9 @@ class eventBus{
 
   }
 
-  removeEventListener(){
+  removeEventListener(event, callback){
     if(this.eventList.includes(event)){
       this.Bus.removeListener(event, callback)
-
     }else{
       throw new Error('no such event')
 
@@ -97,17 +96,30 @@ class eventBus{
   }
 
 }
+
+//--------------------------------------------------------------------//
 //test
 const Bus = new eventBus()
 let events = ['hello', 'world', 'hi']
 Bus._addEvents(events)
-Bus.addEventListener('hello', (who) => console.log('hello', who))
+let helloHendler = (who) => console.log('hello', who)
+
+Bus.addEventListener('hello', helloHendler)
 Bus.addEventListener('world', (who) => console.log('hello', who))
 Bus.addEventListener('hi', (who, jk) => console.log('hello', who, jk))
+
 Bus.Emit('hello', 'kkkkkk')
 Bus.Emit('world', 'kflkforfjog')
 Bus.Emit('hi', 'Lopf', 'GLFMp')
+
+Bus.removeEventListener('hello', helloHendler)
+
 let p = Bus._addEvents(['hi', 'll', 'world'])
 console.log(p)
+
+Bus.Emit('hello')
+
 p = Bus._removeEvents(['hi', 'll', 'lllem'])
 console.log(p)
+// error: no such event
+//Bus.Emit('hi')
