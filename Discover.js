@@ -1,6 +1,8 @@
 class Discover{
   constructor(udpSocket, eventBus, keyStore){
+    // found me
     this.pingList = []
+    // found
     this.echoList = []
     //any user with the id/address in this list
     // will be prevented from connecting to us
@@ -13,7 +15,10 @@ class Discover{
   }
 
   getFoundPeerById(id){
-
+    return this.echoList.find((peer)=>{
+      if(id == peer.id)
+        return true
+    })
   }
 
   getFoundPeerByAddress(address, port){
@@ -21,6 +26,10 @@ class Discover{
   }
 
   getFoundMEPeerById(id){
+    return this.pingList.find((peer)=>{
+      if(id == peer.id)
+        return true
+    })
 
   }
 
