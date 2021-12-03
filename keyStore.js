@@ -121,7 +121,8 @@ class keyStore{
   }
 }
 
-///testing///
+//--------------------------Testing-----------------------------//
+/*
 import {v4 as uuid4} from 'uuid'
 const key_store = new keyStore()
 let peers = [uuid4(), uuid4(), uuid4()]
@@ -136,3 +137,4 @@ let enc
 enc = key_store.aSymetricEncrypt(peers[0], stamps[0], msg)
 console.log(enc)
 console.log(key_store.aSymetricDecrypt(peers[0], stamps[0], enc))
+*/

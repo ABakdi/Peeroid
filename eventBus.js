@@ -97,8 +97,8 @@ class eventBus{
 
 }
 
-//--------------------------------------------------------------------//
-//test
+//--------------------------Testing-----------------------------//
+/*
 const Bus = new eventBus()
 let events = ['hello', 'world', 'hi']
 Bus._addEvents(events)
@@ -123,3 +123,4 @@ p = Bus._removeEvents(['hi', 'll', 'lllem'])
 console.log(p)
 // error: no such event
 //Bus.Emit('hi')
+*/
