@@ -55,9 +55,8 @@ class keyStore{
     return this.Store.find((crate)=> crate.id == peerID)
   }
 
-  generateSymKey(peerID, stamp){
-    const key = generateSymmetricKey()
-    let crate = this.#getCrate()
+  addSymKey(peerID, stamp, key){
+    let crate = this.#getCrate(peerID)
     if(!crate){
       crate = {
         'id': peerID,
@@ -72,6 +71,52 @@ class keyStore{
       crate.keys.sym.push({'stamp': stamp, 'key': key})
     }
   }
+
+  addPublicKey(peerID, stamp, key){
+    let crate = this.#getCrate(peerID)
+    if(!crate){
+      crate = {
+        'id': peerID,
+        'keys':{
+          'sym': [],
+          'asym': []
+        }
+      }
+
+      crate.keys.asym.push({
+        'stamp': stamp,
+        'publicKey': key,
+      })
+      this.Store.push(crate)
+    }else{
+      crate.keys.asym.push({
+        'stamp': stamp,
+        'publicKey': key,
+      })
+    }
+
+  }
+
+  generateSymKey(peerID, stamp){
+    const key = generateSymmetricKey()
+    let crate = this.#getCrate(peerID)
+    if(!crate){
+      crate = {
+        'id': peerID,
+        'keys':{
+          'sym': [],
+          'asym': []
+        }
+      }
+      crate.keys.sym.push({'stamp': stamp, 'key': key})
+      this.Store.push(crate)
+      return key
+    }else{
+      crate.keys.sym.push({'stamp': stamp, 'key': key})
+      return key
+    }
+  }
+  //returns Uint8 publicKey
   generateAsymKey(peerID, stamp){
     const key = generateAsymmetricKey()
     let crate = this.#getCrate(peerID)
@@ -90,12 +135,14 @@ class keyStore{
         'privateKey':key[1],
       })
       this.Store.push(crate)
+      return key[0]
     }else{
       crate.keys.asym.push({
         'stamp': stamp,
         'publicKey': key[0],
         'privateKey':key[1],
       })
+      return key[0]
     }
 
   }
@@ -108,6 +155,10 @@ class keyStore{
   aSymetricEncrypt(peerID, stamp, json){
     const key = this.#getPublicKey(peerID, stamp)
     return AsymEncrypt(key, json)
+  }
+
+  publicKeyEncrypt(publicKey, json){
+    return AsymEncrypt(publicKey, json)
   }
 
   symetricDecrypt(peerID, stamp, message){
