@@ -7,7 +7,8 @@
 //                                                            [encrypted]
 // reciveing an echo with an encrypted body,
 // decrypt body with
-import {Hash} from './asymmetric'
+import {Hash} from './asymmetric.js'
+import broadcastAddress from 'broadcast-address'
 class Discover{
   constructor(udpSocket, eventBus, keyStore, id, name){
     // found me
@@ -73,10 +74,10 @@ class Discover{
     reply.body = this.keyStore.AsymEncrypt(ID, stamp)
 
     // convert message to buffer
-    const reply = Buffer.from(JSON.stringify(message))
+    reply = Buffer.from(JSON.stringify(message))
 
     // send echo
-    this.UdpSocket.send(reply, 0, reply.length, port, address)
+    this.udpSocket.send(reply, 0, reply.length, port, address)
   }
 
 
@@ -130,7 +131,7 @@ class Discover{
   }
   
 
-  Ping(address, port, interface = 'wlp3s0'){
+  Ping(address, port){
     const stamp = '#ping'
     // ping message
     let message = {
@@ -155,12 +156,12 @@ class Discover{
     const msg = Buffer.from(JSON.stringify(message))
 
     // broadcast ping
-    this.UdpSocket.send(msg, 0, msg.length, port, address)
+    this.udpSocket.send(msg, 0, msg.length, port, address)
   }
 
-  SearchLocalNetwork(portList, interface="wlp3s0" bursts = 10, interval = 10){
-    let bursts = bursts
-    const BROADCAST_ADDR = broadcastAddress(interface)
+  SearchLocalNetwork(portList, networkInterface = "wlp3s0", bursts = 10, interval = 10){
+    let counter = bursts
+    const BROADCAST_ADDR = broadcastAddress(networkInterface)
     const stamp = "#burst-ping"
 
     let message = {
@@ -173,20 +174,24 @@ class Discover{
         'stamp': stamp
       }
     }
-    const publicKey = this.KeyStore.generateAsymKey(this.id, stamp)
+    const publicKey = this.keyStore.generateAsymKey(this.id, stamp)
 
     // attach the public key to the message
     message.tail.publicKey = publicKey
     // convert message to buffer
     const msg = Buffer.from(JSON.stringify(message))
+    console.log(message)
 
     const broadcastPresence = ()=>{
       // broadcast
-      this.portList.forEach((port)=>{
-        this.UdpSocket.send(msg, 0, msg.length, port, BROADCAST_ADDR)
+      portList.forEach((port)=>{
+          console.log(msg)
+        this.udpSocket.send(msg, 0, msg.length, port, BROADCAST_ADDR, (msg)=>{
+          console.log(msg)
+        })
       })
-      bursts = bursts-1
-      if(bursts>0)
+      counter = counter - 1
+      if(counter > 0)
         this.UdpBroadcast = setTimeout(broadcastPresence, interval*1000)
     }
 
@@ -200,3 +205,39 @@ class Discover{
   }
 
 }
+
+//--------------------------Testing-----------------------------//
+import keyStore from './keyStore.js'
+import eventBus from './eventBus.js'
+import dgram from 'dgram'
+import {v4 as uuid4} from 'uuid'
+
+const store = new keyStore(),
+      bus = new eventBus(),
+      sock = dgram.createSocket({type:'udp4', reuseAddr: true}),
+      id = uuid4()
+
+const name = process.argv[2],
+      port = Number(process.argv[3]),
+      search = process.argv[4]
+
+const discover = new Discover(sock, bus, store, id, name)
+bus._addEvents('found-peer')
+bus.addEventListener('found-peer', (peer)=>{
+  console.log(peer)
+})
+
+sock.on('message', (message, remote)=>{
+  if(message.header == '__Ping')
+    bus.Emit('#peer-ping', remote.address, remote.port, message.body, message.tail)
+  else if(message.header == '__Echo')
+    bus.Emit('#peer-echo', remote.address, remote.port, message.body, message.tail)
+})
+
+sock.bind(port, ()=>{
+  // make this udp socket able to brodcast
+  sock.setBroadcast(true)
+})
+
+if(search == 'true')
+  discover.SearchLocalNetwork([6562, 6563])

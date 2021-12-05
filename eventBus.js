@@ -97,6 +97,7 @@ class eventBus{
 
 }
 
+export default eventBus
 //--------------------------Testing-----------------------------//
 /*
 const Bus = new eventBus()
