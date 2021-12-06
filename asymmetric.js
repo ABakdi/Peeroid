@@ -2,7 +2,7 @@
 
 import tweetnacl from "tweetnacl"
 const {box, randomBytes, hash} = tweetnacl
-//import types
+//import utility functions
 import pkg from "tweetnacl-util"
 const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64} = pkg
 
@@ -61,7 +61,9 @@ export function generateAsymmetricKey(){
 }
 
 export function Hash(string){
-  return hash(string)
+  let s = decodeUTF8(string)
+  s = encodeBase64(hash(s))
+  return s
 }
 /*
 const obj = {hello: 'world'}
@@ -71,4 +73,9 @@ const encrypted = encrypt(key[0], obj)
 const decrypted = decrypt(key[1], encrypted)
 
 console.log(obj, encrypted, decrypted)
+*/
+/*
+let x = '192.168.8.255:6563'
+x = Hash(x)
+console.log(x)
 */

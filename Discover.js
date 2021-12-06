@@ -7,6 +7,7 @@
 //                                                            [encrypted]
 // reciveing an echo with an encrypted body,
 // decrypt body with
+
 import {Hash} from './asymmetric.js'
 import broadcastAddress from 'broadcast-address'
 class Discover{
@@ -35,14 +36,15 @@ class Discover{
     this.eventBus.addEventListener('#peer-echo', this.#onEcho)
   }
 
-  #onPing(address, port, msgBody, msgTail){
+  #onPing = (address, port, msgBody, msgTail)=>{
     //method will bes excuted when ping message is recived
     const stamp = '#echo'
     if(msgBody.id == this.id)
       return
 
-    const ID = Hash(`${address}:${port}'`)
-    this.keyStore.addPublicKey(ID, msgTail.stamp, msgTail.publicKey)
+    const ID = Hash(`${address}:${port}`)
+    let publicKey = msgTail.publicKey
+    this.keyStore.addPublicKey(ID, msgTail.stamp, publicKey)
 
     let remote = {
       'id':msgBody.id,
@@ -54,11 +56,11 @@ class Discover{
       this.pingList.push(remote)
 
     let symKey = this.keyStore.generateSymKey(ID, stamp)
-    this.Echo(remote.id, symKey,stamp, msgTail.stamp)
+    this.Echo(ID, symKey,stamp, msgTail.stamp, address, port)
 
   }
 
-  Echo(ID, key, symKeyStamp, stamp){
+  Echo(ID, key, symKeyStamp, stamp, address, port){
     let reply = {
       'header': "__Echo",
       'body': {
@@ -71,19 +73,19 @@ class Discover{
         'stamp': stamp
       }
     }
-    reply.body = this.keyStore.AsymEncrypt(ID, stamp)
+    reply.body = this.keyStore.aSymmetricEncrypt(ID, stamp, reply.body)
 
     // convert message to buffer
-    reply = Buffer.from(JSON.stringify(message))
+    reply = Buffer.from(JSON.stringify(reply))
 
     // send echo
     this.udpSocket.send(reply, 0, reply.length, port, address)
   }
 
 
-  #onEcho(address, port, msgBody, msgTail){
+  #onEcho = (address, port, msgBody, msgTail)=>{
     const ID = Hash(`${address}:${port}`)
-    const info = this.keyStore.AsymDecrypt(ID, msgTail.stamp, msgBody)
+    const info = this.keyStore.aSymmetricDecrypt(this.id, msgTail.stamp, msgBody)
 
     let remote = {
       'id': info.id,
@@ -91,7 +93,7 @@ class Discover{
       'address': address,
       'port': port
     }
-    if(!this.getFoundPeerByAddress(info.id)){
+    if(!this.getFoundPeerById(info.id)){
       this.echoList.push(remote)
       this.eventBus.Emit('found-peer', remote)
     }
@@ -159,7 +161,7 @@ class Discover{
     this.udpSocket.send(msg, 0, msg.length, port, address)
   }
 
-  SearchLocalNetwork(portList, networkInterface = "wlp3s0", bursts = 10, interval = 10){
+  SearchLocalNetwork(portList, networkInterface = "wlp3s0", bursts = 10, interval = 2){
     let counter = bursts
     const BROADCAST_ADDR = broadcastAddress(networkInterface)
     const stamp = "#burst-ping"
@@ -180,15 +182,11 @@ class Discover{
     message.tail.publicKey = publicKey
     // convert message to buffer
     const msg = Buffer.from(JSON.stringify(message))
-    console.log(message)
 
     const broadcastPresence = ()=>{
       // broadcast
       portList.forEach((port)=>{
-          console.log(msg)
-        this.udpSocket.send(msg, 0, msg.length, port, BROADCAST_ADDR, (msg)=>{
-          console.log(msg)
-        })
+        this.udpSocket.send(msg, 0, msg.length, port, BROADCAST_ADDR)
       })
       counter = counter - 1
       if(counter > 0)
@@ -207,14 +205,16 @@ class Discover{
 }
 
 //--------------------------Testing-----------------------------//
+/*
 import keyStore from './keyStore.js'
 import eventBus from './eventBus.js'
 import dgram from 'dgram'
 import {v4 as uuid4} from 'uuid'
+import { Buffer } from 'buffer';
 
 const store = new keyStore(),
       bus = new eventBus(),
-      sock = dgram.createSocket({type:'udp4', reuseAddr: true}),
+      sock = dgram.createSocket('udp4'),
       id = uuid4()
 
 const name = process.argv[2],
@@ -222,16 +222,13 @@ const name = process.argv[2],
       search = process.argv[4]
 
 const discover = new Discover(sock, bus, store, id, name)
-bus._addEvents('found-peer')
-bus.addEventListener('found-peer', (peer)=>{
-  console.log(peer)
-})
 
-sock.on('message', (message, remote)=>{
-  if(message.header == '__Ping')
-    bus.Emit('#peer-ping', remote.address, remote.port, message.body, message.tail)
-  else if(message.header == '__Echo')
-    bus.Emit('#peer-echo', remote.address, remote.port, message.body, message.tail)
+bus._addEvents('found-peer')
+
+bus.addEventListener('found-peer', (peer)=>{
+  console.log('found-peer: ', peer)
+  console.log("ping-list:", discover.pingList)
+  console.log("echo-list:", discover.echoList)
 })
 
 sock.bind(port, ()=>{
@@ -239,5 +236,13 @@ sock.bind(port, ()=>{
   sock.setBroadcast(true)
 })
 
+sock.on('message', (message, remote)=>{
+  message = JSON.parse(message.toString())
+  if(message.header == '__Ping')
+    bus.Emit('#peer-ping', remote.address, remote.port, message.body, message.tail)
+  else if(message.header == '__Echo')
+    bus.Emit('#peer-echo', remote.address, remote.port, message.body, message.tail)
+})
 if(search == 'true')
   discover.SearchLocalNetwork([6562, 6563])
+*/
