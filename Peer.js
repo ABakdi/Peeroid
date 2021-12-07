@@ -5,12 +5,6 @@ import {v4 as uuidv4} from 'uuid'
 import EventEmitter from 'events'
 import broadcastAddress from 'broadcast-address'
 
-// asymetric encryption
-import {generateAsymmetricKey,
-        AsymEncrypt, AsymDecrypt, Hash } from './asymmetric.js'
-
-import {generateSymmetricKey,
-        SymEncrypt, SymDecrypt} from './symmetric.js'
 class Peer{
   constructor(name, portList){
     this.id = uuidv4()
@@ -23,76 +17,19 @@ class Peer{
     this.portList = portList
     this.Peers = new PeersManager()
     this.EventBus = new EventEmitter()
-    this.foundPeers = []
-    this.foundMepeers = []
-    this.UdpBroadcast = null
     this.UdpSocket = dgram.createSocket({type:'udp4', reuseAddr: true})
     this.TcpServer = null
 
-    this.KeyStore = []
 
     this.eventsList = ['tcp-data', 'tcp-end', 'tcp-close', 'tcp-error', 'tcp-client',
                        'udp-data', 'found-peer', 'peer-accept',
                        'connection-request', 'tcp-connected']
-
-
-    //this fix is here because apperently
-    // I cant use the same handler for tow
-    // diffrent events
-    this.EventBus.on("#peer-ping", this.#discovery_handler)
-    this.EventBus.on("#peer-echo", (remote_peer, found)=>{
-      this.#discovery_handler(remote_peer, found)
-    })
-
-  }
-
-  #getPrivateKey(publicKey){
-    let privateKey = this.KeyStore.find((key)=>{
-      return (key[0] == publicKey)
-    })
-
-    if(privateKey)
-      return privateKey[1]
-    else
-      throw new Error('key does not exist')
   }
 
   setVisible(visible){
       this.visible = visible
   }
 
-  getFoundpeerById(id, found){
-    let list = []
-    if(found)
-      list = this.foundPeers
-    else
-      list = this.foundMepeers
-
-    return list.find((peer)=>{
-      if(id == peer.id)
-        return true
-    })
-  }
-
-  getFoundpeerByAddress(address, port, found){
-    let list = []
-    if(found)
-      list = this.foundPeers
-    else
-      list = this.foundMepeers
-
-    return list.find((peer)=>{
-      if(address == peer.address && port == peer.port)
-        return true
-    })
-  }
-
-  addEventListener(event, callback){
-    if(!this.eventsList.includes(event)){
-      throw 'event does not exist: '+event
-    }
-    this.EventBus.addListener(event, callback)
-  }
 
   Start(port){
     let Port = port
@@ -273,82 +210,7 @@ class Peer{
     let isRemoteRecognized = this.getFoundpeerByAddress(remote_peer.address, remote_peer.port, found)
     isRemoteRecognized = Boolean(isRemoteRecognized)
 
-    if(!isRemoteRecognized){
-      if(found){
-        this.foundPeers.push(remote_peer)
-        this.EventBus.emit('found-peer', remote_peer)
-      }else{
-        if(this.visible){
-          let publicKey = remote_peer.publicKey
 
-          // generate symetric key
-          const key = generateSymmetricKey()
-          //associate it with remote peer
-          remote_peer.key = key
-          this.foundMepeers.push(remote_peer)
-          let reply = {
-            'header': "__Echo",
-            'body': {
-              'id': this.id,
-              'name': this.name,
-              'key': key
-            },
-            'tail':{
-              'publicKey': publicKey
-            }
-          }
-
-          //conver public key to Uint8Array (key format)
-          publicKey = new Uint8Array(publicKey.split(',').map(Number))
-
-          //encrypt the body of reply
-          reply.body = AsymEncrypt(publicKey,reply.body)
-
-          // convert reply ro buffer
-          reply = Buffer.from(JSON.stringify(reply))
-
-          this.UdpSocket.send(reply, 0, reply.length, remote_peer.port, remote_peer.address)
-        }
-      }
-    }
-  }
-  
-
-  Search(interval = 5){
-    clearInterval(this.UdpBroadcast)
-    const BROADCAST_ADDR = broadcastAddress('wlp3s0')
-    //const PORT = portList
-
-    let message = {
-      'header': "__Ping",
-      'body':{
-        'id': this.id,
-        'name': this.name,
-      },
-      'tail':{}
-    }
-
-    const broadcastPresence = ()=>{
-      const key = generateAsymmetricKey()
-      // stor the key pair
-      this.KeyStore.push([key[0].toString(),key[1]])
-
-      // attach the public key to the message
-      message.tail.publicKey = key[0].toString()
-
-      // convert message to buffer
-      const msg = Buffer.from(JSON.stringify(message))
-
-      // broadcast
-      this.portList.forEach((port)=>{
-        this.UdpSocket.send(msg, 0, msg.length, port, BROADCAST_ADDR)
-      })
-      this.UdpBroadcast = setTimeout(broadcastPresence, interval*1000)
-    }
-
-
-    this.UdpBroadcast = setTimeout(broadcastPresence, interval*1000)
-  }
 
   ConnectionRequest(id){
     let peer = this.getFoundpeerById(id, true)
