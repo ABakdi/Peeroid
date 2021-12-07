@@ -6,7 +6,8 @@
 // replys with an echo message {'header': "__Echo", 'body':[{id, name, key}]}
 //                                                            [encrypted]
 // reciveing an echo with an encrypted body,
-// decrypt body with
+// decrypt body with the key generated earlier
+// emmit peer-found event
 
 import {Hash} from './asymmetric.js'
 import broadcastAddress from 'broadcast-address'
