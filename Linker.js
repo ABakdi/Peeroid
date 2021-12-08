@@ -1,13 +1,35 @@
 import PeersManager from './PeersManager.js'
 import net from 'net'
+import {Hash} from './asymmetric.js'
 
 class Linker{
-  constructor(tcpSocket, udpSocket, Discovery){
-    this.tcpSocket = tcpSocket
+  constructor(udpSocket, Discovery, keyStore){
     this.udpSocket = udpSocket
     this.Discovery = Discovery
+    this.keyStore = keyStore
     this.Peers = new PeersManager()
+  }
 
+  requestConnection(id, stamp){
+    let peer = this.Discovery.getFoundpeerById(id)
+    if(!peer){
+      throw new Error('no such peer')
+    }
+
+    let message = {
+      'header': "__Connect",
+      'body':{
+        'id': this.id,
+        'name': this.name
+      }
+    }
+    const ID = Hash(`${peer.address}:${peer.port}`)
+
+    message.body = this.keyStore.symmetricEncrypt(ID, stamp, message.body)
+
+    message = Buffer.from(JSON.stringify(message))
+
+    this.UdpSocket.send(message, 0,message.length , peer.port, peer.address)
   }
 
   tcpConnect(id){
@@ -48,6 +70,7 @@ class Linker{
 
     // When receive server send back data.
     client.on('data', (data)=>{
+      data = JSON.parse(data.toString())
       this.eventBus.Emit('tcp-data', id, data)
     })
 
@@ -72,11 +95,61 @@ class Linker{
 
   }
 
-  tcpSend(id, json){
+  tcpSend(id, stamp, json, header = "__Data"){
+    peer = this.Peers.getPeerById(id)
+    if(!peer)
+      throw new Error('no such peer')
 
+    const ID = Hash(`${peer.address}:${peer.port}`)
+
+    if(!this.keyStore.checkKey(ID, stamp))
+      throw new Error('no such key')
+
+    let body = this.keyStore.symmetricEncrypt(ID, peer.stamp, json)
+    let msg = {
+      'header': header,
+      'body': body,
+      'tail':{
+        peer.stamp
+      }
+    }
+    msg = JSON.stringify(msg)
+    peer.tcpSocket.write(msg)
   }
 
-  udpSend(id, json){
+  udpSend(id, stamp, json, header = "__Data"){
+    peer = this.Peers.getPeerById(id)
+    if(!peer)
+      throw new Error('no such peer')
 
+    const ID = Hash(`${peer.address}:${peer.port}`)
+
+    if(!this.keyStore.checkKey(ID, stamp))
+      throw new Error('no such key')
+
+    let body = this.keyStore.symmetricEncrypt(ID, , json)
+    let msg = {
+      'header': header,
+      'body': body,
+      'tail':{
+        'stamp': stamp
+      }
+    }
+    msg = JSON.stringify(msg)
+    if(peer.udpSocket)
+      console.log("not yet!!")
+    else
+      this.udpSocket.send(msg, 0, msg.length, peer.port, peer.address)
+  }
+
+  Kill(id){
+    let peer = this.Peers.getPeerById(id)
+    if(!peer)
+      throw new Error('no such peer')
+
+    peer.ref.destroy()
+    this.Peers.removePeerById(id)
   }
 }
+
+export default Linker

@@ -37,37 +37,57 @@ class Discover{
     this.eventBus.addEventListener('#peer-echo', this.#onEcho)
   }
 
-  #onPing = (address, port, msgBody, msgTail)=>{
-    //method will bes excuted when ping message is recived
+  #onPing = (address, port, message)=>{
+    // method will bes excuted when ping message is recieved
+
+    // stamp key with #echo
+    // key stamped with this will ecrypt the
+    // echo message body
     const stamp = '#echo'
-    if(msgBody.id == this.id)
+    // if sender id is equal to our id
+    // we're pingin' our selfs
+    // so do nothing
+    if(message.body.id == this.id)
       return
 
+    // key store id for this peer is
+    // the hash of address:port
     const ID = Hash(`${address}:${port}`)
-    let publicKey = msgTail.publicKey
-    this.keyStore.addPublicKey(ID, msgTail.stamp, publicKey)
+    // message tail contains public key
+    // will be used to encrypt echo message
+    let publicKey = message.tail.publicKey
+    // store this key for later use
+    this.keyStore.addPublicKey(ID, message.tail.stamp, publicKey)
 
     let remote = {
-      'id':msgBody.id,
-      'name': msgBody.name,
+      'id': message.body.id,
+      'name': message.body.name,
       'address': address,
       'port': port
     }
-    if(!this.getFoundMEPeerById(msgBody.id))
+    // check if peer already sent us a ping
+    if(!this.getFoundMEPeerById(message.body.id))
       this.pingList.push(remote)
 
+    // generate symmetric key to be used for further comunication
     let symKey = this.keyStore.generateSymKey(ID, stamp)
-    this.Echo(ID, symKey,stamp, msgTail.stamp, address, port)
+
+    // send echo only when visible
+    if(this.visible)
+      this.Echo(ID, message.tail.stamp, symkey, stamp, address, port)
 
   }
 
-  Echo(ID, key, symKeyStamp, stamp, address, port){
+  Echo(ID, stamp, symkey, symKeyStamp, address, port){
+    // ID, stamp: what key we should use to encrypt message body.
+    // symKey, symKeyStamp: symmetric key and its stamp
+    // this will be used for further communication
     let reply = {
       'header': "__Echo",
       'body': {
         'id': this.id,
         'name': this.name,
-        'key': key,
+        'key': symkey,
         'stamp': symKeyStamp
       },
       'tail':{
@@ -84,9 +104,13 @@ class Discover{
   }
 
 
-  #onEcho = (address, port, msgBody, msgTail)=>{
+  #onEcho = (address, port, message)=>{
+    // function will be excuted when recieving echo messake
+
+    // key-store id is the hash of address:port
     const ID = Hash(`${address}:${port}`)
-    const info = this.keyStore.aSymmetricDecrypt(this.id, msgTail.stamp, msgBody)
+    //decrypt body
+    const info = this.keyStore.aSymmetricDecrypt(this.id, message.tail.stamp, message.body)
 
     let remote = {
       'id': info.id,
@@ -94,11 +118,14 @@ class Discover{
       'address': address,
       'port': port
     }
+    // check if peer has been found already
     if(!this.getFoundPeerById(info.id)){
       this.echoList.push(remote)
+      // new peer found
       this.eventBus.Emit('found-peer', remote)
     }
-
+    // add symmetric key contained in echo message to key-store
+    // this key will be used for further communication
     this.keyStore.addSymKey(ID, info.stamp, info.key)
   }
 
@@ -204,7 +231,7 @@ class Discover{
   }
 
 }
-
+export default Discover
 //--------------------------Testing-----------------------------//
 /*
 import keyStore from './keyStore.js'
@@ -240,9 +267,9 @@ sock.bind(port, ()=>{
 sock.on('message', (message, remote)=>{
   message = JSON.parse(message.toString())
   if(message.header == '__Ping')
-    bus.Emit('#peer-ping', remote.address, remote.port, message.body, message.tail)
+    bus.Emit('#peer-ping', remote.address, remote.port, message)
   else if(message.header == '__Echo')
-    bus.Emit('#peer-echo', remote.address, remote.port, message.body, message.tail)
+    bus.Emit('#peer-echo', remote.address, remote.port, message)
 })
 if(search == 'true')
   discover.SearchLocalNetwork([6562, 6563])

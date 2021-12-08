@@ -220,6 +220,20 @@ class keyStore{
     const key = this.#getPrivateKey(ID, stamp)
     return AsymDecrypt(key, message)
   }
+
+  // checks if peer with ID
+  // already posese the key with "stamp"
+  checkStamp(ID, stamp){
+    try{
+      key = this.#getKey(ID, stamp)
+      if(key)
+        return true
+      else
+        return false
+    }catch(e){
+      return false
+    }
+  }
 }
 
 export default keyStore

@@ -1,52 +1,66 @@
 import dgram from 'dgram'
 import net from 'net'
-import PeersManager from './PeersManager.js'
 import {v4 as uuidv4} from 'uuid'
-import EventEmitter from 'events'
 import broadcastAddress from 'broadcast-address'
+import { Hash } from './asymmetric.js'
+import keyStore from './keyStore.js'
+import Discover from './Discover.js'
+import eventBus from './eventBus.js'
+import Linker from './Linker.js'
 
 class Peer{
   constructor(name, portList){
     this.id = uuidv4()
     this.name = name
-    this.visible = true
     // these are the ports that will be serched
     // when loking for peers
     // we also will bind to one of these ports randomly
     // if not specified otherwise
     this.portList = portList
-    this.Peers = new PeersManager()
-    this.EventBus = new EventEmitter()
+
     this.UdpSocket = dgram.createSocket({type:'udp4', reuseAddr: true})
     this.TcpServer = null
 
+    this._eventBus = new eventBus()
+    this._keyStore = new keyStore()
+    this._Discovery = new Discover(this.UdpSocket, this._eventBus, this._keyStore, this.id, this.name)
+    this._Linker = new Linker(this.UdpSocket, this._Discovery, this._keyStore)
+
 
     this.eventsList = ['tcp-data', 'tcp-end', 'tcp-close', 'tcp-error', 'tcp-client',
-                       'udp-data', 'found-peer', 'peer-accept',
-                       'connection-request', 'tcp-connected']
+                       'udp-data', 'found-peer','connection-request', 'tcp-connected']
   }
 
   setVisible(visible){
-      this.visible = visible
+    this._Discovery.setVisible(visible)
   }
 
 
   Start(port){
     let Port = port
+    // if port isn't specified
+    // choose a random port from this.portList
     if(!Port)
       Port =  this.portList[Math.floor(Math.random()*this.portList.length)]
+
     this.UdpSocket.bind(Port,()=>{
       let add = this.UdpSocket.address()
-      this.TcpServer = net.createServer({'host': add.address, 'port': add.port}, (client)=>{
+
+      const options = {
+        'host': add.address,
+        'port': add.port
+      }
+
+      this.TcpServer = net.createServer(options, (client)=>{
         // all the code in here will be excuted when
         // new tcp client connects to to this server
-        // infromation related to the client are in tcp_client
+        // infromation related to the client are in client: parameter
 
         // use utf-8 encodeing for messaging
         client.setEncoding('utf-8')
 
         // Note: this is just a quick fix, I couldn't find any other way.
-        //remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
+        // remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
         // we are only intrested in tha part that I put in prakets,
         // tha last part, it is the ipv4 address
         let address = client.remoteAddress.split(':')
@@ -59,38 +73,36 @@ class Peer{
           'localPort': client.localPort
         }
 
-
         let info
         for(let port of this.portList){
-          info = this.getFoundpeerByAddress(address, port, true)
+          info = this._Discovery.getFoundpeerByAddress(address, port)
           if(info)
             break
         }
 
-        let TcpClient = {
+        let peer = {
           ...info,
           ref: client
         }
 
-        this.Peers.addPeer(TcpClient)
+        this.Peers.addPeer(peer)
 
         // emit 'tcp-client' with the relevant information
-        this.EventBus.emit('tcp-client', TcpClient)
+        this.EventBus.emit('tcp-client', client)
 
         // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
         client.on('data',(data)=>{
-          let id = TcpClient.id
-          data = JSON.parse(data)
-          let key = this.Peers.getPeerById(id).key
-          if(data.header == "__Data"){
-            let dataBody = SymDecrypt(data.body, key)
-            this.EventBus.emit('tcp-data', id, dataBody.data)
-          }
+          // calculate keyStore ID
+          const ID = Hash(`${peer.address}:${peer.port}`)
+          // decrypt data body
+          const body = this._keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
+          data.body = body
+
+          this._eventBus.emit('tcp-data', peer.id, data)
         })
 
         client.on('end', ()=>{
-          let id = TcpClient.id
-          this.EventBus.emit('tcp-end', id)
+          this._eventBus.emit('tcp-end', peer.id)
         })
 
       })
@@ -103,11 +115,11 @@ class Peer{
       this.TcpServer.listen(server_port, ()=>{
 
         this.TcpServer.on('close', ()=>{
-          this.EventBus.emit('tcp-close')
+          this._eventBus.emit('tcp-close')
         })
 
         this.TcpServer.on('error', (error)=>{
-          this.EventBus.emit('tcp-error', error)
+          this._eventBus.emit('tcp-error', error)
         })
       })
     })
@@ -125,248 +137,34 @@ class Peer{
         throw "unable to parse message: "+ err
       }
       this.#udpMessageHandler(msg, remote)
-
     })
-
   }
 
   #udpMessageHandler(message, remote){
-    const decryptBody = (body, found, connected=false)=>{
-      // found specifies which found-peer to search
-      // if connected is true we serch Peers
-      let peer
-
-      if(connected){
-        peer = this.Peers.getPeerByAddress(remote.address, remote.port)
-      }else{
-        peer = this.getFoundpeerByAddress(remote.address, remote.port, found)
-      }
-
-      if(!peer){
-        throw new Error('peer is not recognized')
-      }else{
-        return SymDecrypt(body, peer.key)
-      }
-    }
-
-    let remote_peer = null
-    let body
+    const ID = Hash(`${address}:${port}`)
+    const body = this._keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
+    message.body = body
     switch(message.header){
       case "__Ping":
-        if(message.body.id == this.id)
-          break
-        // store the relevant information about this server for later use
-        remote_peer = {
-          'id': message.body.id,
-          'name': message.body.name,
-          'address': remote.address,
-          'port': remote.port,
-          'publicKey': message.tail.publicKey,
-        }
-        // peer found me "found = false"
-        this.EventBus.emit('#peer-ping', remote_peer, false)
+        this.eventBus.Emit('#peer-ping', remote.address, remote.port, message)
         break
 
       case "__Echo":
-
-        const privateKey = this.#getPrivateKey(message.tail.publicKey)
-        body = AsymDecrypt(privateKey, message.body)
-
-        if(body.id == this.id)
-          break
-
-        remote_peer = {
-          'id': body.id,
-          'name': body.name,
-          'address': remote.address,
-          'port': remote.port,
-          'key': body.key
-        }
-
-        // found peer "found = true"
-        this.EventBus.emit('#peer-echo', remote_peer, true)
+        this.eventBus.Emit('#peer-echo', remote.address, remote.port, message)
         break
 
       case "__Connect":
-        // found = false, I recived connect meaning peer found me
-        body = decryptBody(message.body, false)
         this.EventBus.emit('connection-request', body.id, body.name)
         break
 
       case "__Accept":
-        // found = true, I recived accept meaning i sent connect to ap peer i found
-        body = decryptBody(message.body, true)
-        this.EventBus.emit('peer-accept', body.id, body.answer)
         break
 
       case "__Data":
-        body = decryptBody(message.body, false, true)
         this.EventBus.emit('udp-data', body.id, body.data)
         break
     }
   }
 
-  #discovery_handler = (remote_peer, found)=>{
-    let isRemoteRecognized = this.getFoundpeerByAddress(remote_peer.address, remote_peer.port, found)
-    isRemoteRecognized = Boolean(isRemoteRecognized)
-
-
-
-  ConnectionRequest(id){
-    let peer = this.getFoundpeerById(id, true)
-    if(!peer){
-      throw 'Peer is not recognized'
-    }
-
-    let message = {
-      'header': "__Connect",
-      'body':{
-        'id': this.id,
-        'name': this.name
-      }
-    }
-    message.body = SymEncrypt(message.body, peer.key)
-
-    message = Buffer.from(JSON.stringify(message))
-
-    this.UdpSocket.send(message, 0,message.length , peer.port, peer.address)
-  }
-
-  RefuseConnection(id){
-    let peer = this.getFoundpeerById(id, false)
-    if(!peer){
-      throw 'Peer is not recognized'
-    }
-
-    let msg = {
-      'header': '__Accept',
-      'body':{
-        id: this.id,
-        answer: 'no'
-      }
-    }
-    msg.body = SymEncrypt(msg.body, peer.key)
-    msg = JSON.stringify(msg)
-
-    this.UdpSocket.send(msg, 0, msg.length, peer.port, peer.address)
-  }
-
-  Connect(id){
-    let peer = this.getFoundpeerById(id, false)
-
-    if(!peer){
-      throw 'Peer is not recognized'
-    }
-
-    let options = {
-      'host': peer.address,
-      'port': peer.port
-    }
-
-    let msg = {
-      'header': '__Accept',
-      'body':{
-        id: this.id,
-        answer: 'yes',
-      }
-    }
-    msg.body = SymEncrypt(msg.body, peer.key)
-    msg = Buffer.from(JSON.stringify(msg))
-    this.UdpSocket.send(msg, 0, msg.length, peer.port, peer.address, ()=>{
-    // Create TCP client.
-    var client = net.createConnection(options, ()=>{
-
-      let info = {
-        'localAdress': client.localAddress,
-        'remoteAddress': client.remoteAddress,
-        'localPort': client.localPort,
-        'remotePort': client.remotePort,
-        'name': peer.name,
-        'id': peer.id
-      }
-      var address_temp = client.remoteAddress
-
-      var tcpClient = {
-        'id' : peer.id,
-        'name' : peer.name,
-        'address' : client.remoteAddress,
-        'port' : client.remotePort,
-        'ref' : client,
-        'key': peer.key
-      }
-      this.Peers.addPeer(tcpClient)
-      this.EventBus.emit('tcp-connected', info)
-    })
-    //client.setTimeout(1000)
-
-    client.setEncoding('utf8')
-
-    // When receive server send back data.
-    client.on('data', (data)=>{
-      let id = tcpClient.id
-      data = JSON.parse(data)
-      let key = this.Peers.getPeerById(id).key
-      if(data.header == "__Data"){
-        let dataBody = SymDecrypt(data.body, key)
-        this.EventBus.emit('tcp-data', id, dataBody.data)
-      }
-    })
-
-    // When connection disconnected.
-    client.on('end', ()=>{
-      this.EventBus.emit('tcp-end', id)
-    })
-
-    /*
-    client.on('timeout', function () {
-      console.log('Client connection timeout. ')
-    })
-    */
-
-    client.on('error', (error)=>{
-      this.EventBus.emit('tcp-error', id, error)
-    })
-
-    })
-  }
-
-  UdpSend(id, message){
-    let peer = this.Peers.getPeerById(id)
-    let msg = {
-      'header': "__Data",
-      'body':{
-        'id': this.id,
-        'data': message
-      }
-    }
-    msg.body = SymEncrypt(msg.body, peer.key)
-    msg = Buffer.from(JSON.stringify(msg))
-    this.UdpSocket.send(msg, 0, msg.length, peer.port, peer.address)
-  }
-
-  TcpSend(id, message){
-    let peer = this.Peers.getPeerById(id)
-    let msg = {
-      'header' : "__Data",
-      'body' : {
-        'data': message
-      }
-    }
-    msg.body = SymEncrypt(msg.body, peer.key)
-    msg = JSON.stringify(msg)
-    peer.ref.write(msg)
-
-  }
-
-  SendFile(id, fileUrl){
-    let peer = this.Peers.getPeerById(id)
-
-  }
-
-  Kill(id){
-    let peer = this.Peers.getPeerById(id)
-    peer.ref.destroy()
-    this.Peers.removePeerById(id)
-  }
 }
 export default Peer
