@@ -28,6 +28,7 @@ class Discover{
 
     this.id = id
     this.name = name
+    this.visible = true
 
     this.udpBroadcast = null
 
@@ -127,6 +128,10 @@ class Discover{
     // add symmetric key contained in echo message to key-store
     // this key will be used for further communication
     this.keyStore.addSymKey(ID, info.stamp, info.key)
+  }
+
+  setVisible(visible){
+    this.visible = visible
   }
 
   getFoundPeerById(id){

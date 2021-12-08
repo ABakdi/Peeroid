@@ -27,8 +27,8 @@ class Peer{
     this._Linker = new Linker(this.UdpSocket, this._Discovery, this._keyStore)
 
 
-    this.eventsList = ['tcp-data', 'tcp-end', 'tcp-close', 'tcp-error', 'tcp-client',
-                       'udp-data', 'found-peer','connection-request', 'tcp-connected']
+    this._eventBus._addEvents(['tcp-data', 'tcp-end', 'tcp-close', 'tcp-error', 'tcp-client',
+                               'udp-data', 'found-peer','connection-request', 'tcp-connected'])
   }
 
   setVisible(visible){
@@ -73,6 +73,7 @@ class Peer{
           'localPort': client.localPort
         }
 
+        // this is kinda stupid
         let info
         for(let port of this.portList){
           info = this._Discovery.getFoundpeerByAddress(address, port)
@@ -80,11 +81,13 @@ class Peer{
             break
         }
 
+        // construct peer object
         let peer = {
           ...info,
           ref: client
         }
 
+        // add peer to peersManager
         this.Peers.addPeer(peer)
 
         // emit 'tcp-client' with the relevant information
@@ -98,11 +101,11 @@ class Peer{
           const body = this._keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
           data.body = body
 
-          this._eventBus.emit('tcp-data', peer.id, data)
+          this._eventBus.Emit('tcp-data', peer.id, data)
         })
 
         client.on('end', ()=>{
-          this._eventBus.emit('tcp-end', peer.id)
+          this._eventBus.Emit('tcp-end', peer.id)
         })
 
       })
@@ -115,11 +118,11 @@ class Peer{
       this.TcpServer.listen(server_port, ()=>{
 
         this.TcpServer.on('close', ()=>{
-          this._eventBus.emit('tcp-close')
+          this._eventBus.Emit('tcp-close')
         })
 
         this.TcpServer.on('error', (error)=>{
-          this._eventBus.emit('tcp-error', error)
+          this._eventBus.Emit('tcp-error', error)
         })
       })
     })
@@ -134,7 +137,7 @@ class Peer{
       try{
         msg = JSON.parse(message.toString())
       }catch(err){
-        throw "unable to parse message: "+ err
+        throw new Error("unable to parse message")
       }
       this.#udpMessageHandler(msg, remote)
     })
@@ -146,22 +149,22 @@ class Peer{
     message.body = body
     switch(message.header){
       case "__Ping":
-        this.eventBus.Emit('#peer-ping', remote.address, remote.port, message)
+        this._eventBus.Emit('#peer-ping', remote.address, remote.port, message)
         break
 
       case "__Echo":
-        this.eventBus.Emit('#peer-echo', remote.address, remote.port, message)
+        this._eventBus.Emit('#peer-echo', remote.address, remote.port, message)
         break
 
       case "__Connect":
-        this.EventBus.emit('connection-request', body.id, body.name)
+        this._eventBus.emit('connection-request', body.id, body.name)
         break
 
       case "__Accept":
         break
 
       case "__Data":
-        this.EventBus.emit('udp-data', body.id, body.data)
+        this._eventBus.emit('udp-data', body.id, body.data)
         break
     }
   }
