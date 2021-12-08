@@ -21,22 +21,55 @@ class Peer{
     this.UdpSocket = dgram.createSocket({type:'udp4', reuseAddr: true})
     this.TcpServer = null
 
-    this._eventBus = new eventBus()
-    this._keyStore = new keyStore()
-    this._Discovery = new Discover(this.UdpSocket, this._eventBus, this._keyStore, this.id, this.name)
-    this._Linker = new Linker(this.UdpSocket, this._Discovery, this._keyStore)
+    this._eventBus = null
+    this._keyStore = null
+    this._Discovery = null
+    this._Linker = null
 
-
-    this._eventBus._addEvents(['tcp-data', 'tcp-end', 'tcp-close', 'tcp-error', 'tcp-client',
-                               'udp-data', 'found-peer','connection-request', 'tcp-connected'])
   }
 
+  set _eventBus(bus){
+    if(bus instanceof eventBus){
+      this._eventBus = bus
+      this._eventBus._addEvents(['tcp-data', 'tcp-end', 'tcp-close',
+                                 'tcp-error', 'tcp-client','udp-data',
+                                 'found-peer','connection-request',
+                                 'tcp-connected'])
+    }else{
+      throw new Error('must be eventBus object')
+    }
+  }
+
+  set _keyStore(store){
+    if(store instanceof keyStore){
+      this._keyStore = store
+    }else{
+      throw new Error('must be keyStore object')
+    }
+  }
+
+  set _Discovery(discover){
+    if(discover instanceof Discover){
+      this._Discovery = discover
+    }else{
+      throw new Error('must be Discover object')
+    }
+  }
+
+  set _Linker(linker){
+    if(linker instanceof Linker){
+      this._Discovery = linker
+    }else{
+      throw new Error('must be Discover object')
+    }
+  }
   setVisible(visible){
     this._Discovery.setVisible(visible)
   }
 
 
   Start(port){
+    if(!this._ev)
     let Port = port
     // if port isn't specified
     // choose a random port from this.portList

@@ -79,17 +79,13 @@ peer.addEventListener('connection-request', async function(id, name){
   const question = id + " : " + name + " want's to connect to you:[Y|n]\n"
   var ans = await yesOrNoQuestion(id, name, question)
   if(ans){
-    peer.Connect(id)
-  }else{
-    peer.RefuseConnection(id)
-    console.log('Connection refused')
-  }
+    peer._Linker.tcpConnect(id)
 })
 
 peer.addEventListener('tcp-client', function(tcp_client){
   console.log('tcp-client')
   //console.log(tcp_client)
-  let fp = peer.foundPeers
+  let fp = peer
   console.log('found peers', fp)
   let c = peer.Peers
   console.log(c)
