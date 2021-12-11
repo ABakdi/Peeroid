@@ -1,13 +1,37 @@
 import PeersManager from './PeersManager.js'
 import net from 'net'
 import {Hash} from './asymmetric.js'
-
+import keyStore from './keyStore.js'
+import Discover from './Discover.js'
+import eventBus from './eventBus.js'
 class Linker{
-  constructor(udpSocket, Discovery, keyStore){
+  constructor(udpSocket){
     this.udpSocket = udpSocket
-    this.Discovery = Discovery
-    this.keyStore = keyStore
     this.Peers = new PeersManager()
+  }
+
+  set _eventBus(bus){
+    if(bus instanceof eventBus){
+      this.eventBus = bus
+    }else{
+      throw new Error('must be eventBus object')
+    }
+  }
+
+  set _keyStore(store){
+    if(store instanceof keyStore){
+      this.keyStore = store
+    }else{
+      throw new Error('must be keyStore object')
+    }
+  }
+
+  set _Discovery(discover){
+    if(discover instanceof Discover){
+      this.Discovery = discover
+    }else{
+      throw new Error('must be Discover object')
+    }
   }
 
   requestConnection(id, stamp){
@@ -110,7 +134,7 @@ class Linker{
       'header': header,
       'body': body,
       'tail':{
-        peer.stamp
+        'stamp': peer.stamp
       }
     }
     msg = JSON.stringify(msg)
@@ -127,7 +151,7 @@ class Linker{
     if(!this.keyStore.checkKey(ID, stamp))
       throw new Error('no such key')
 
-    let body = this.keyStore.symmetricEncrypt(ID, , json)
+    let body = this.keyStore.symmetricEncrypt(ID, stamp, json)
     let msg = {
       'header': header,
       'body': body,

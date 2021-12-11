@@ -123,11 +123,11 @@ class keyStore{
       return key
     }
   }
-  //returns Uint8 publicKey
+  //returns publicKey as base64 string
   generateAsymKey(ID, stamp){
     const key = generateAsymmetricKey()
     const publicKey = encodeBase64(key[0])
-    const privateKey = encodeBase64(key[0])
+    const privateKey = encodeBase64(key[1])
     let crate = this.#getCrate(ID)
     if(!crate){
       crate = {
@@ -218,6 +218,7 @@ class keyStore{
 
   aSymmetricDecrypt(ID, stamp, message){
     const key = this.#getPrivateKey(ID, stamp)
+    console.log(this.Store[0].keys.asym)
     return AsymDecrypt(key, message)
   }
 

@@ -11,8 +11,14 @@
 
 import {Hash} from './asymmetric.js'
 import broadcastAddress from 'broadcast-address'
+import keyStore from './keyStore.js'
+import eventBus from './eventBus.js'
+//import utility functions
+import pkg from "tweetnacl-util"
+const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64} = pkg
+
 class Discover{
-  constructor(udpSocket, eventBus, keyStore, id, name){
+  constructor(udpSocket, id, name){
     // found me
     this.pingList = []
     // found
@@ -23,8 +29,6 @@ class Discover{
     this.blockList = []
 
     this.udpSocket = udpSocket
-    this.eventBus = eventBus
-    this.keyStore = keyStore
 
     this.id = id
     this.name = name
@@ -32,10 +36,26 @@ class Discover{
 
     this.udpBroadcast = null
 
-    this.eventBus._addEvents(['#peer-ping', '#peer-echo'])
+  }
 
-    this.eventBus.addEventListener('#peer-ping', this.#onPing)
-    this.eventBus.addEventListener('#peer-echo', this.#onEcho)
+  set _eventBus(bus){
+    if(bus instanceof eventBus){
+      this.eventBus = bus
+      this.eventBus._addEvents(['#peer-ping', '#peer-echo'])
+
+      this.eventBus.addEventListener('#peer-ping', this.#onPing)
+      this.eventBus.addEventListener('#peer-echo', this.#onEcho)
+    }else{
+      throw new Error('must be eventBus object')
+    }
+  }
+
+  set _keyStore(store){
+    if(store instanceof keyStore){
+      this.keyStore = store
+    }else{
+      throw new Error('must be keyStore object')
+    }
   }
 
   #onPing = (address, port, message)=>{
@@ -75,7 +95,7 @@ class Discover{
 
     // send echo only when visible
     if(this.visible)
-      this.Echo(ID, message.tail.stamp, symkey, stamp, address, port)
+      this.Echo(ID, message.tail.stamp, symKey, stamp, address, port)
 
   }
 

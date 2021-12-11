@@ -2,11 +2,14 @@ import dgram from 'dgram'
 import net from 'net'
 import {v4 as uuidv4} from 'uuid'
 import broadcastAddress from 'broadcast-address'
-import { Hash } from './asymmetric.js'
 import keyStore from './keyStore.js'
 import Discover from './Discover.js'
 import eventBus from './eventBus.js'
 import Linker from './Linker.js'
+import {Hash} from './asymmetric.js'
+//import utility functions
+import pkg from "tweetnacl-util"
+const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64} = pkg
 
 class Peer{
   constructor(name, portList){
@@ -20,21 +23,18 @@ class Peer{
 
     this.UdpSocket = dgram.createSocket({type:'udp4', reuseAddr: true})
     this.TcpServer = null
+  }
 
-    this._eventBus = null
-    this._keyStore = null
-    this._Discovery = null
-    this._Linker = null
-
+  get udpSocket(){
+    return this.UdpSocket
   }
 
   set _eventBus(bus){
     if(bus instanceof eventBus){
-      this._eventBus = bus
-      this._eventBus._addEvents(['tcp-data', 'tcp-end', 'tcp-close',
+      this.eventBus = bus
+      this.eventBus._addEvents(['tcp-data', 'tcp-end', 'tcp-close',
                                  'tcp-error', 'tcp-client','udp-data',
-                                 'found-peer','connection-request',
-                                 'tcp-connected'])
+                                 'found-peer','connection-request'])
     }else{
       throw new Error('must be eventBus object')
     }
@@ -42,7 +42,7 @@ class Peer{
 
   set _keyStore(store){
     if(store instanceof keyStore){
-      this._keyStore = store
+      this.keyStore = store
     }else{
       throw new Error('must be keyStore object')
     }
@@ -50,7 +50,7 @@ class Peer{
 
   set _Discovery(discover){
     if(discover instanceof Discover){
-      this._Discovery = discover
+      this.Discovery = discover
     }else{
       throw new Error('must be Discover object')
     }
@@ -58,18 +58,26 @@ class Peer{
 
   set _Linker(linker){
     if(linker instanceof Linker){
-      this._Discovery = linker
+      this.Linker = linker
     }else{
       throw new Error('must be Discover object')
     }
   }
   setVisible(visible){
-    this._Discovery.setVisible(visible)
+    this.Discovery.setVisible(visible)
   }
 
 
   Start(port){
-    if(!this._ev)
+    if(!this.eventBus)
+      throw new Error('must set eventBus befor start')
+    if(!this.Discovery)
+      throw new Error('must set Discovery befor start')
+    if(!this.Linker)
+      throw new Error('must set Linker befor start')
+    if(!this.keyStore)
+      throw new Error('must set keyStore befor start')
+
     let Port = port
     // if port isn't specified
     // choose a random port from this.portList
@@ -109,7 +117,7 @@ class Peer{
         // this is kinda stupid
         let info
         for(let port of this.portList){
-          info = this._Discovery.getFoundpeerByAddress(address, port)
+          info = this.Discovery.getFoundpeerByAddress(address, port)
           if(info)
             break
         }
@@ -124,21 +132,21 @@ class Peer{
         this.Peers.addPeer(peer)
 
         // emit 'tcp-client' with the relevant information
-        this.EventBus.emit('tcp-client', client)
+        this.eventBus.emit('tcp-client', peer)
 
         // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
         client.on('data',(data)=>{
           // calculate keyStore ID
           const ID = Hash(`${peer.address}:${peer.port}`)
           // decrypt data body
-          const body = this._keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
+          const body = this.keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
           data.body = body
 
-          this._eventBus.Emit('tcp-data', peer.id, data)
+          this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name}, data.body)
         })
 
         client.on('end', ()=>{
-          this._eventBus.Emit('tcp-end', peer.id)
+          this.eventBus.Emit('tcp-end', peer.id, peer.name)
         })
 
       })
@@ -151,11 +159,11 @@ class Peer{
       this.TcpServer.listen(server_port, ()=>{
 
         this.TcpServer.on('close', ()=>{
-          this._eventBus.Emit('tcp-close')
+          this.eventBus.Emit('tcp-close')
         })
 
         this.TcpServer.on('error', (error)=>{
-          this._eventBus.Emit('tcp-error', error)
+          this.eventBus.Emit('tcp-error', error)
         })
       })
     })
@@ -177,27 +185,35 @@ class Peer{
   }
 
   #udpMessageHandler(message, remote){
-    const ID = Hash(`${address}:${port}`)
-    const body = this._keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
-    message.body = body
+    const ID = Hash(`${remote.address}:${remote.port}`)
+    let body = message.body
     switch(message.header){
       case "__Ping":
-        this._eventBus.Emit('#peer-ping', remote.address, remote.port, message)
+        this.eventBus.Emit('#peer-ping', remote.address, remote.port, message)
         break
 
       case "__Echo":
-        this._eventBus.Emit('#peer-echo', remote.address, remote.port, message)
+        body = encodeBase64(message.body)
+        body = this.keyStore.aSymmetricDecrypt(this.id, message.tail.stamp, body)
+        message.body = body
+        this.eventBus.Emit('#peer-echo', remote.address, remote.port, message)
         break
 
       case "__Connect":
-        this._eventBus.emit('connection-request', body.id, body.name)
+        body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
+        message.body = body
+        this.eventBus.emit('connection-request', body.id, body.name)
         break
 
       case "__Accept":
+        body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
+        message.body = body
         break
 
       case "__Data":
-        this._eventBus.emit('udp-data', body.id, body.data)
+        body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
+        message.body = body
+        this.eventBus.emit('udp-data', {'id': body.id, 'name': body.name}, body.data)
         break
     }
   }
