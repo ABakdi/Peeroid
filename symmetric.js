@@ -60,3 +60,11 @@ const decrypted = decrypt(encrypted, key)
 
 console.log("Decrypted:", decrypted)
 */
+/*
+const key = generateSymmetricKey()
+let msg = {"kkk": "kkk", "mmm": "mpkj"}
+msg = SymEncrypt(msg, key)
+console.log(msg)
+msg = SymDecrypt(msg, key)
+console.log(msg)
+*/

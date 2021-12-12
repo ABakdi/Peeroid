@@ -15,7 +15,7 @@ const _eventBus = new eventBus()
 const _keyStore = new keyStore()
 
 const _discovery = new Discover(peer.udpSocket, peer.id, name)
-const _linker = new Linker(peer.udpSocket)
+const _linker = new Linker(peer.udpSocket, peer.id, name)
 
 // use the same event bus and keystrore for
 // discovery link and peer in order
@@ -39,37 +39,45 @@ peer._Linker = _linker
 // Doscovery
 _eventBus.addEventListener('found-peer', (info)=>{
   // log peer info
-  term.green('-------------found-peer-------------')
-  term(`${info.id}:${info.name}`)
-  term(`${info.address}:${info.port}`)
+  term.green('-------------found-peer-------------\n')
+  term(`${info.id}:${info.name}\n`)
+  term(`${info.address}:${info.port}\n`)
+
+  // cennect when peer is found
+  // select which key to use
+  let keyStamp = '#echo'
+  _linker.requestConnection(info.id, "#echo")
 })
 
 // Connections
 
 _eventBus.addEventListener('connection-request', (id, name)=>{
-  term.green('------------connection-request---------')
-  term(`from: ${id}:${name}'`)
+  term.green('------------connection-request---------\n')
+  term(`from: ${id}:${name}\n`)
+
+  // connect
+  _linker.tcpConnect(id)
 })
 
 _eventBus.addEventListener('tcp-client', (info)=>{
   // log peer info
-  term.blue('--------------tcp-connection---------')
-  term(`${info.id}:${info.name}`)
-  term(`local address: ${info.localAddress}:${info.localPort}`)
-  term(`remote address: ${info.remoteAddress}:${info.remotePort}`)
+  term.blue('--------------tcp-connection---------\n')
+  term(`${info.id}:${info.name}\n`)
+  term(`local address: ${info.localAddress}:${info.localPort}\n`)
+  term(`remote address: ${info.remoteAddress}:${info.remotePort}\n`)
 })
 
 _eventBus.addEventListener('tcp-end', (id, name)=>{
-  term.yellow('----------connection-ended----------')
-  term(`${id}:${name}`)
+  term.yellow('----------connection-ended----------\n')
+  term(`${id}:${name}\n`)
 })
 
 _eventBus.addEventListener('tcp-close', ()=>{
-  term.orange('-----closed-----')
+  term.orange('-----closed-----\n')
 })
 
 _eventBus.addEventListener('tcp-error', (error)=>{
-  term.red('------internal-server-Error------------ ')
+  term.red('------internal-server-Error------------ \n')
   term(error)
 })
 
@@ -77,14 +85,14 @@ _eventBus.addEventListener('tcp-error', (error)=>{
 _eventBus.addEventListener('udp-data', (info, data)=>{
   // probably needs some data handler to reconstruct
   // the date in case of a file or someting
-  term.green('----------------udp-data--------------')
-  term.blue(`from: ${info.id}:${info.name}`)
+  term.green('----------------udp-data--------------\n')
+  term.blue(`from: ${info.id}:${info.name}\n`)
   term(data)
 })
 
 _eventBus.addEventListener('tcp-data', (info, data)=>{
-  term.green('----------------tcp-data--------------')
-  term.blue(`from: ${info.id}:${info.name}`)
+  term.green('----------------tcp-data--------------\n')
+  term.blue(`from: ${info.id}:${info.name}\n`)
   term(data)
 })
 

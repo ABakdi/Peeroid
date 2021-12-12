@@ -50,6 +50,8 @@ export function AsymDecrypt(secretOrSharedKey, messageWithNonce, key){
   return JSON.parse(base64DecryptedMessage)
 }
 
+// FIXME public and private key
+// should not be the same
 export function generateAsymmetricKey(){
   const pairA = generateKeyPair()
   const pairB = generateKeyPair()
@@ -66,16 +68,14 @@ export function Hash(string){
   return s
 }
 /*
-const obj = {hello: 'world'}
-const key = generateKey()
-
-const encrypted = encrypt(key[0], obj)
-const decrypted = decrypt(key[1], encrypted)
-
-console.log(obj, encrypted, decrypted)
-*/
-/*
-let x = '192.168.8.255:6563'
-x = Hash(x)
-console.log(x)
+/wtf public and privete key are the same
+//this is some sirous security flaw
+const key = generateAsymmetricKey()
+console.log(key)
+let msg = {"hh": "lll", "lklk": "lklk"}
+console.log(msg)
+msg = AsymEncrypt(key[0], msg)
+console.log(msg)
+msg = AsymDecrypt(key[1], msg)
+console.log(msg)
 */

@@ -139,15 +139,17 @@ class Discover{
       'address': address,
       'port': port
     }
+    
+    // add symmetric key contained in echo message to key-store
+    // this key will be used for further communication
+    this.keyStore.addSymKey(ID, info.stamp, info.key)
+
     // check if peer has been found already
     if(!this.getFoundPeerById(info.id)){
       this.echoList.push(remote)
       // new peer found
       this.eventBus.Emit('found-peer', remote)
     }
-    // add symmetric key contained in echo message to key-store
-    // this key will be used for further communication
-    this.keyStore.addSymKey(ID, info.stamp, info.key)
   }
 
   setVisible(visible){

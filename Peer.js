@@ -185,24 +185,22 @@ class Peer{
   }
 
   #udpMessageHandler(message, remote){
-    const ID = Hash(`${remote.address}:${remote.port}`)
-    let body = message.body
+    let body
+    let ID = Hash(`${remote.address}:${remote.port}`)
     switch(message.header){
       case "__Ping":
         this.eventBus.Emit('#peer-ping', remote.address, remote.port, message)
         break
 
       case "__Echo":
-        body = encodeBase64(message.body)
-        body = this.keyStore.aSymmetricDecrypt(this.id, message.tail.stamp, body)
-        message.body = body
         this.eventBus.Emit('#peer-echo', remote.address, remote.port, message)
         break
 
       case "__Connect":
+        ID = Hash(`${remote.address}:${remote.port}`)
         body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
-        message.body = body
-        this.eventBus.emit('connection-request', body.id, body.name)
+        // message.body = body
+        this.eventBus.Emit('connection-request', body.id, body.name)
         break
 
       case "__Accept":
@@ -213,7 +211,7 @@ class Peer{
       case "__Data":
         body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
         message.body = body
-        this.eventBus.emit('udp-data', {'id': body.id, 'name': body.name}, body.data)
+        this.eventBus.Emit('udp-data', {'id': body.id, 'name': body.name}, body.data)
         break
     }
   }

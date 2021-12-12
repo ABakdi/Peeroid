@@ -5,9 +5,11 @@ import keyStore from './keyStore.js'
 import Discover from './Discover.js'
 import eventBus from './eventBus.js'
 class Linker{
-  constructor(udpSocket){
+  constructor(udpSocket, id, name){
     this.udpSocket = udpSocket
     this.Peers = new PeersManager()
+    this.id = id
+    this.name = name
   }
 
   set _eventBus(bus){
@@ -35,7 +37,7 @@ class Linker{
   }
 
   requestConnection(id, stamp){
-    let peer = this.Discovery.getFoundpeerById(id)
+    let peer = this.Discovery.getFoundPeerById(id)
     if(!peer){
       throw new Error('no such peer')
     }
@@ -45,6 +47,9 @@ class Linker{
       'body':{
         'id': this.id,
         'name': this.name
+      },
+      'tail':{
+        'stamp': stamp
       }
     }
     const ID = Hash(`${peer.address}:${peer.port}`)
@@ -53,11 +58,11 @@ class Linker{
 
     message = Buffer.from(JSON.stringify(message))
 
-    this.UdpSocket.send(message, 0,message.length , peer.port, peer.address)
+    this.udpSocket.send(message, 0,message.length , peer.port, peer.address)
   }
 
   tcpConnect(id){
-    peer = this.Discovery.getFoundPeerById(id)
+    let peer = this.Discovery.getFoundMEPeerById(id)
     if(!peer)
       throw new Error('no such peer')
 

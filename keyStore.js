@@ -54,7 +54,7 @@ class keyStore{
     if(!block)
       throw Error('no key stamped with: ' + stamp)
 
-    return decodeBase64(block.key)
+    return block.key
 
   }
 
@@ -105,7 +105,7 @@ class keyStore{
   }
 
   generateSymKey(ID, stamp){
-    const key = encodeBase64(generateSymmetricKey())
+    const key = generateSymmetricKey()
     let crate = this.#getCrate(ID)
     if(!crate){
       crate = {
@@ -218,7 +218,6 @@ class keyStore{
 
   aSymmetricDecrypt(ID, stamp, message){
     const key = this.#getPrivateKey(ID, stamp)
-    console.log(this.Store[0].keys.asym)
     return AsymDecrypt(key, message)
   }
 
@@ -258,4 +257,19 @@ key_store.Purge(peers[0])
 key_store.removeAsymKey(peers[1], stamps[1])
 console.log(key_store)
 console.log(key_store.Store[0].keys)
+*/
+/*
+import {v4 as uuid4} from 'uuid'
+const key_store = new keyStore()
+let peers = [uuid4(), uuid4(), uuid4()]
+let stamps = ['p1', 'p2', 'p3']
+for(let i in peers)
+  for(let j in stamps)
+    key_store.generateSymKey(peers[i], stamps[j])
+
+const msg = {'hello': 'world'}
+let enc
+enc = key_store.symmetricEncrypt(peers[0], stamps[0], msg)
+console.log(enc)
+console.log(key_store.symmetricDecrypt(peers[0], stamps[0], enc))
 */
