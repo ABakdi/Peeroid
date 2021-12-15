@@ -4,6 +4,7 @@ import {Hash} from './asymmetric.js'
 import keyStore from './keyStore.js'
 import Discover from './Discover.js'
 import eventBus from './eventBus.js'
+import Requests from './requests.js'
 class Linker{
   constructor(udpSocket, id, name){
     this.udpSocket = udpSocket
@@ -15,6 +16,9 @@ class Linker{
   set _eventBus(bus){
     if(bus instanceof eventBus){
       this.eventBus = bus
+      this.eventBus._addEvents(['tcp-data', 'tcp-end',
+                                'tcp-error','tcp-connected',
+                                'tcp-client','connection-request'])
     }else{
       throw new Error('must be eventBus object')
     }
@@ -25,6 +29,14 @@ class Linker{
       this.keyStore = store
     }else{
       throw new Error('must be keyStore object')
+    }
+  }
+
+  set _requests(req){
+    if(req instanceof Requests){
+      this.Requests = req
+    }else{
+      throw new Error('must be requests object')
     }
   }
 
@@ -59,6 +71,7 @@ class Linker{
     message = Buffer.from(JSON.stringify(message))
 
     this.udpSocket.send(message, 0,message.length , peer.port, peer.address)
+    this.Requests.addRequest(peer.id)
   }
 
   tcpConnect(id){
@@ -84,10 +97,7 @@ class Linker{
       let address_temp = client.remoteAddress
 
       const tcpClient = {
-        'id' : peer.id,
-        'name' : peer.name,
-        'address' : client.remoteAddress,
-        'port' : client.remotePort,
+        ...peer,
         'ref' : client,
       }
       this.Peers.addPeer(tcpClient)
@@ -105,7 +115,7 @@ class Linker{
 
     // When connection disconnected.
     client.on('end', ()=>{
-      this.eventBus.Emit('tcp-end', id)
+      this.eventBus.Emit('tcp-end', peer.id, peer.name)
     })
 
     /*

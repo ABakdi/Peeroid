@@ -1,14 +1,18 @@
 import dgram from 'dgram'
 import net from 'net'
+import os from 'os'
 import {v4 as uuidv4} from 'uuid'
 import broadcastAddress from 'broadcast-address'
 import keyStore from './keyStore.js'
 import Discover from './Discover.js'
 import eventBus from './eventBus.js'
 import Linker from './Linker.js'
+import requests from './requests.js'
 import {Hash} from './asymmetric.js'
+
 //import utility functions
 import pkg from "tweetnacl-util"
+import PeersManager from './PeersManager.js'
 const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64} = pkg
 
 class Peer{
@@ -63,6 +67,14 @@ class Peer{
       throw new Error('must be Discover object')
     }
   }
+
+  set _requests(req){
+    if(req instanceof requests){
+      this.Requests = req
+    }else{
+      throw new Error('must be requests object')
+    }
+  }
   setVisible(visible){
     this.Discovery.setVisible(visible)
   }
@@ -77,21 +89,24 @@ class Peer{
       throw new Error('must set Linker befor start')
     if(!this.keyStore)
       throw new Error('must set keyStore befor start')
+    if(!this.Requests)
+      throw new Error('must set Requests befor start')
+
 
     let Port = port
     // if port isn't specified
     // choose a random port from this.portList
+    let Address = os.networkInterfaces().wlp3s0[0].address
     if(!Port)
       Port =  this.portList[Math.floor(Math.random()*this.portList.length)]
 
-    this.UdpSocket.bind(Port,()=>{
+    this.UdpSocket.bind(Port, ()=>{
       let add = this.UdpSocket.address()
 
       const options = {
-        'host': add.address,
+        'address': Address,
         'port': add.port
       }
-
       this.TcpServer = net.createServer(options, (client)=>{
         // all the code in here will be excuted when
         // new tcp client connects to to this server
@@ -104,8 +119,11 @@ class Peer{
         // remove the ipv6 part ::ffff:[xxx.xxx.xxx.xxx]
         // we are only intrested in tha part that I put in prakets,
         // tha last part, it is the ipv4 address
+        // note2: this seems to be a valid way because the address starts with
+        // ffff meaning the reminder is ipv4
         let address = client.remoteAddress.split(':')
         address = address[address.length -1]
+
 
         let remote_client = {
           'remoteAddress': client.remoteAddress,
@@ -117,10 +135,34 @@ class Peer{
         // this is kinda stupid
         let info
         for(let port of this.portList){
-          info = this.Discovery.getFoundpeerByAddress(address, port)
+          info = this.Discovery.getFoundPeerByAddress(address, port)
           if(info)
             break
         }
+
+        if(!info && address == '127.0.0.1'){
+           for(let port of this.portList){
+             info = this.Discovery.echoList.find((p)=> p.port == port)
+             if(info)
+               break
+           }
+        }
+
+        // check if tcp client is related to some
+        // already existing recognized peer
+        // if not close the connection
+        if(!info){
+          client.destroy()
+          return
+        }
+        // check if this client is allowed
+        // if not end the connection
+        let status = this.Requests.getRequestStatus(info.id)
+        if(status != "waiting"){
+          client.destroy()
+          return
+        }
+        this.Requests.resolveRequest(info.id, "connected")
 
         // construct peer object
         let peer = {
@@ -129,10 +171,10 @@ class Peer{
         }
 
         // add peer to peersManager
-        this.Peers.addPeer(peer)
+        this.Linker.Peers.addPeer(peer)
 
         // emit 'tcp-client' with the relevant information
-        this.eventBus.emit('tcp-client', peer)
+        this.eventBus.Emit('tcp-client', peer)
 
         // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
         client.on('data',(data)=>{
@@ -150,7 +192,6 @@ class Peer{
         })
 
       })
-      // make this udp socket able to brodcast
       this.UdpSocket.setBroadcast(true)
 
       //udp and tcp servers will bind to the same port
@@ -200,6 +241,7 @@ class Peer{
         ID = Hash(`${remote.address}:${remote.port}`)
         body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
         // message.body = body
+        this.Requests.addRemoteRequest(body.id)
         this.eventBus.Emit('connection-request', body.id, body.name)
         break
 
