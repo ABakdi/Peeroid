@@ -70,6 +70,14 @@ _eventBus.addEventListener('tcp-client', (info)=>{
   term(`${info.id}:${info.name}\n`)
   term(`local address: ${info.localAddress}:${info.localPort}\n`)
   term(`remote address: ${info.remoteAddress}:${info.remotePort}\n`)
+  // once connected send data
+  const data = {
+    'greeting':'Hello there',
+    'do-this': 'resend this, when recieved'
+  }
+  const stamp = _keyStore.Store[1].keys.sym[0].stamp
+
+  _linker.tcpSend(info.id, stamp, data)
 })
 
 _eventBus.addEventListener('tcp-connected', (info)=>{
@@ -105,7 +113,13 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
 _eventBus.addEventListener('tcp-data', (info, data)=>{
   term.green('----------------tcp-data--------------\n')
   term.blue(`from: ${info.id}:${info.name}\n`)
-  term(data)
+  console.log(data)
+
+  //echo data
+  if(search == "false"){
+    const stamp = _keyStore.Store[0].keys.sym[0].stamp
+    _linker.tcpSend(info.id, stamp, data)
+  }
 })
 
 //start

@@ -167,24 +167,23 @@ class Peer{
         // construct peer object
         let peer = {
           ...info,
-          ref: client
+          'tcpSocket': client
         }
 
         // add peer to peersManager
         this.Linker.Peers.addPeer(peer)
 
         // emit 'tcp-client' with the relevant information
-        this.eventBus.Emit('tcp-client', peer)
+        this.eventBus.Emit('tcp-client', {'id': peer.id, 'name': peer.name, ...remote_client})
 
         // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
         client.on('data',(data)=>{
+          data = JSON.parse(data.toString())
           // calculate keyStore ID
           const ID = Hash(`${peer.address}:${peer.port}`)
           // decrypt data body
-          const body = this.keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
-          data.body = body
-
-          this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name}, data.body)
+          data = this.keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
+          this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name}, data)
         })
 
         client.on('end', ()=>{

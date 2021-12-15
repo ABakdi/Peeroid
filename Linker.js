@@ -86,7 +86,7 @@ class Linker{
 
     const client = net.createConnection(options, ()=>{
       let info = {
-        'localAdress': client.localAddress,
+        'localAddress': client.localAddress,
         'remoteAddress': client.remoteAddress,
         'localPort': client.localPort,
         'remotePort': client.remotePort,
@@ -98,7 +98,7 @@ class Linker{
 
       const tcpClient = {
         ...peer,
-        'ref' : client,
+        'tcpSocket' : client,
       }
       this.Peers.addPeer(tcpClient)
       this.eventBus.Emit('tcp-connected', info)
@@ -110,7 +110,9 @@ class Linker{
     // When receive server send back data.
     client.on('data', (data)=>{
       data = JSON.parse(data.toString())
-      this.eventBus.Emit('tcp-data', id, data)
+      const ID = Hash(`${peer.address}:${peer.port}`)
+      data = this.keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
+      this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name}, data)
     })
 
     // When connection disconnected.
@@ -135,7 +137,7 @@ class Linker{
   }
 
   tcpSend(id, stamp, json, header = "__Data"){
-    peer = this.Peers.getPeerById(id)
+    const peer = this.Peers.getPeerById(id)
     if(!peer)
       throw new Error('no such peer')
 
@@ -144,12 +146,12 @@ class Linker{
     if(!this.keyStore.checkKey(ID, stamp))
       throw new Error('no such key')
 
-    let body = this.keyStore.symmetricEncrypt(ID, peer.stamp, json)
+    let body = this.keyStore.symmetricEncrypt(ID, stamp, json)
     let msg = {
       'header': header,
       'body': body,
       'tail':{
-        'stamp': peer.stamp
+        'stamp': stamp
       }
     }
     msg = JSON.stringify(msg)

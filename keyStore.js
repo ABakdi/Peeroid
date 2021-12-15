@@ -57,6 +57,17 @@ class keyStore{
     return block.key
 
   }
+  checkKey(ID, stamp){
+    try{
+      let Key = this.#getKey(ID, stamp)
+      if(Key)
+        return true
+      else
+        return false
+    }catch(e){
+      return false
+    }
+  }
 
   #getCrate(ID){
     return this.Store.find((crate)=> crate.id == ID)
