@@ -251,8 +251,8 @@ class Peer{
 
       case "__Data":
         body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
-        message.body = body
-        this.eventBus.Emit('udp-data', {'id': body.id, 'name': body.name}, body.data)
+        let peer = this.Linker.Peers.getPeerByAddress(remote.address, remote.port)
+        this.eventBus.Emit('udp-data', {'id': peer.id, 'name': peer.name}, body)
         break
     }
   }

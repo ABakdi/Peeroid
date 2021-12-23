@@ -107,7 +107,7 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
   // the date in case of a file or someting
   term.green('----------------udp-data--------------\n')
   term.blue(`from: ${info.id}:${info.name}\n`)
-  term(data)
+  console.log(data)
 })
 
 _eventBus.addEventListener('tcp-data', (info, data)=>{
@@ -119,6 +119,7 @@ _eventBus.addEventListener('tcp-data', (info, data)=>{
   if(search == "false"){
     const stamp = _keyStore.Store[0].keys.sym[0].stamp
     _linker.tcpSend(info.id, stamp, data)
+    _linker.udpSend(info.id, stamp, data)
   }
 })
 

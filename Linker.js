@@ -159,7 +159,7 @@ class Linker{
   }
 
   udpSend(id, stamp, json, header = "__Data"){
-    peer = this.Peers.getPeerById(id)
+    const peer = this.Peers.getPeerById(id)
     if(!peer)
       throw new Error('no such peer')
 

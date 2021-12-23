@@ -1,6 +1,19 @@
+/*
+ * there are tow types of request
+ * local request: request made by local device "asking remote to connect to us"
+ * remote request: reuest mede by remote device "remote is asking us to connect to it"
+ * request format:
+ * {
+ *   id: peer uuid(local: peer we requested)(remote: peer requested us)
+ *   status: "waiting"/"accepted"/"connected"
+ * }
+ *
+ */
 class Requests{
   constructor(){
+    // local requests
     this.requests = []
+    // remote requests
     this.remoteRequests = []
   }
 
