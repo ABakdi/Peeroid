@@ -139,14 +139,17 @@ class Peer{
           if(info)
             break
         }
+        console.log(client.remoteAddress)
 
-        if(!info && address == '127.0.0.1'){
+        if(!info && address == '1'){
            for(let port of this.portList){
              info = this.Discovery.echoList.find((p)=> p.port == port)
              if(info)
                break
            }
         }
+
+        console.log(info)
 
         // check if tcp client is related to some
         // already existing recognized peer

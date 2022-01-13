@@ -13,6 +13,7 @@
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "uuid": "^8.3.2",
-    "uuid-tool": "^2.0.3"
+    "uuid-tool": "^2.0.3",
+    "ws": "^8.4.0"
   }
 }

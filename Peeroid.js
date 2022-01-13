@@ -5,10 +5,12 @@ import keyStore from './keyStore.js'
 import eventBus from './eventBus.js'
 import terminal from 'terminal-kit';
 import requests from './requests.js'
+import {WebSocketServer} from 'ws'
 const {terminal: term} = terminal;
 const name = process.argv[2],
       port = Number(process.argv[3]),
-      search = process.argv[4]
+      search = process.argv[4],
+      sockPort = process.argv[5]
 
 
 const peer = new Peer(name, [6562, 6563])
@@ -17,6 +19,21 @@ const _keyStore = new keyStore()
 const _requests = new requests()
 const _discovery = new Discover(peer.udpSocket, peer.id, name)
 const _linker = new Linker(peer.udpSocket, peer.id, name)
+
+// will send commands
+// and recieves updates
+let peeroidClient = null
+
+// peeriod server
+const server = new WebSocketServer({port: sockPort})
+server.on('connection', client =>{
+  if(!peeroidClient){
+    peeroidClient = client
+    server.on('message', message =>{
+      console.log(message)
+    })
+  }
+})
 
 // use the same event bus and keystrore for
 // discovery link and peer in order
@@ -37,6 +54,13 @@ peer._eventBus  = _eventBus
 peer._keyStore = _keyStore
 peer._Linker = _linker
 peer._requests = _requests
+
+function check_and_send(msg){
+  if(peeroidClient){
+    msg = JSON.stringify(msg)
+    peeroidClient.send(msg)
+  }
+}
 
 // Doscovery
 _eventBus.addEventListener('found-peer', (info)=>{
@@ -86,7 +110,9 @@ _eventBus.addEventListener('tcp-connected', (info)=>{
   term(`${info.id}:${info.name}\n`)
   term(`local address: ${info.localAddress}:${info.localPort}\n`)
   term(`remote address: ${info.remoteAddress}:${info.remotePort}\n`)
+
 })
+
 _eventBus.addEventListener('tcp-end', (id, name)=>{
   term.yellow('----------connection-ended----------\n')
   term(`${id}:${name}\n`)
