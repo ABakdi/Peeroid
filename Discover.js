@@ -216,7 +216,7 @@ class Discover{
     this.udpSocket.send(msg, 0, msg.length, port, address)
   }
 
-  SearchLocalNetwork(portList, networkInterface = "wlp3s0", bursts = 10, interval = 2){
+  SearchLocalNetwork(portList, networkInterface = "wlp3s0", bursts = 10, interval = 10){
     let counter = bursts
     const BROADCAST_ADDR = broadcastAddress(networkInterface)
     const stamp = "#burst-ping"

@@ -27,11 +27,48 @@ let peeroidClient = null
 // peeriod server
 const server = new WebSocketServer({port: sockPort})
 server.on('connection', client =>{
+
   if(!peeroidClient){
+    console.log('pclient')
     peeroidClient = client
-    server.on('message', message =>{
-      console.log(message)
+    let peerID = null
+    peeroidClient.on('message', message =>{
+      // convert message to json
+      let msg = JSON.parse(message.toString())
+
+      // find out what command is being
+      // given and act accordingly
+      switch(msg.command){
+        case 'connect':
+          peerID = msg.param.id
+          let keyStamp = '#echo'
+          _linker.requestConnection(peerID, "#echo")
+          break
+        case 'local-search':
+          _discovery.SearchLocalNetwork([6562, 6563])
+          break
+
+        case 'accept':
+          peerID = msg.param.id
+          _requests.resolveRmoteRequest(peerID, 'accepted')
+          _linker.tcpConnect(peerID)
+          break
+
+        case 'send':
+          peerID = msg.param.id
+          let payload = {
+            'payload': msg.param.payload
+          }
+          _linker.tcpSend(peerID, '#echo', payload)
+          break
+      }
+        console.log(msg)
     })
+  }
+  else{
+    client.send(JSON.stringify({'peeriod-client error':
+                                'cant connect multple peeriod-clients, one is already running.'}))
+    client.close()
   }
 })
 
@@ -55,67 +92,55 @@ peer._keyStore = _keyStore
 peer._Linker = _linker
 peer._requests = _requests
 
-function check_and_send(msg){
+function check_and_send(event, info, data){
   if(peeroidClient){
+    let msg = {
+      'event': event,
+      'info': info,
+      'data': data
+    }
     msg = JSON.stringify(msg)
     peeroidClient.send(msg)
+    console.log(msg)
   }
 }
 
 // Doscovery
 _eventBus.addEventListener('found-peer', (info)=>{
-  // log peer info
-  term.green('-------------found-peer-------------\n')
-  term(`${info.id}:${info.name}\n`)
-  term(`${info.address}:${info.port}\n`)
 
-  // cennect when peer is found
-  // select which key to use
-  let keyStamp = '#echo'
-  _linker.requestConnection(info.id, "#echo")
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('found-peer', info, null)
 })
 
 // Connections
 
 _eventBus.addEventListener('connection-request', (id, name)=>{
-  term.green('------------connection-request---------\n')
-  term(`from: ${id}:${name}\n`)
 
-  _requests.resolveRmoteRequest(id, 'accepted')
-
-  console.log('connecting...')
-  _linker.tcpConnect(id)
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('connection-request', {'id':id, 'name':name}, null)
 
 })
 
 _eventBus.addEventListener('tcp-client', (info)=>{
-  // log peer info
-  term.blue('--------------tcp-client---------\n')
-  term(`${info.id}:${info.name}\n`)
-  term(`local address: ${info.localAddress}:${info.localPort}\n`)
-  term(`remote address: ${info.remoteAddress}:${info.remotePort}\n`)
-  // once connected send data
-  const data = {
-    'greeting':'Hello there',
-    'do-this': 'resend this, when recieved'
-  }
-  const stamp = _keyStore.Store[1].keys.sym[0].stamp
 
-  _linker.tcpSend(info.id, stamp, data)
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('peer-connected', info, null)
 })
 
 _eventBus.addEventListener('tcp-connected', (info)=>{
-  // log peer info
-  term.blue('--------------tcp-connected---------\n')
-  term(`${info.id}:${info.name}\n`)
-  term(`local address: ${info.localAddress}:${info.localPort}\n`)
-  term(`remote address: ${info.remoteAddress}:${info.remotePort}\n`)
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('peer-connected', info, null)
 
 })
 
 _eventBus.addEventListener('tcp-end', (id, name)=>{
-  term.yellow('----------connection-ended----------\n')
-  term(`${id}:${name}\n`)
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('tcp-end', {'id': id, 'name': name}, null)
 })
 
 _eventBus.addEventListener('tcp-close', ()=>{
@@ -125,31 +150,26 @@ _eventBus.addEventListener('tcp-close', ()=>{
 _eventBus.addEventListener('tcp-error', (error)=>{
   term.red('------internal-server-Error------------ \n')
   term(error)
+
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('tcp-error', error, null)
 })
 
 // Data
 _eventBus.addEventListener('udp-data', (info, data)=>{
   // probably needs some data handler to reconstruct
   // the date in case of a file or someting
-  term.green('----------------udp-data--------------\n')
-  term.blue(`from: ${info.id}:${info.name}\n`)
-  console.log(data)
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('udp-data', info, data)
 })
 
 _eventBus.addEventListener('tcp-data', (info, data)=>{
-  term.green('----------------tcp-data--------------\n')
-  term.blue(`from: ${info.id}:${info.name}\n`)
-  console.log(data)
-
-  //echo data
-  if(search == "false"){
-    const stamp = _keyStore.Store[0].keys.sym[0].stamp
-    _linker.tcpSend(info.id, stamp, data)
-    _linker.udpSend(info.id, stamp, data)
-  }
+  // send to peeriod-clients
+  // if one is connected
+  check_and_send('tcp-data', info, data)
 })
 
 //start
 peer.Start(port)
-if(search =="true")
-  _discovery.SearchLocalNetwork([6562, 6563])

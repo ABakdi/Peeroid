@@ -139,7 +139,6 @@ class Peer{
           if(info)
             break
         }
-        console.log(client.remoteAddress)
 
         if(!info && address == '1'){
            for(let port of this.portList){
@@ -149,7 +148,6 @@ class Peer{
            }
         }
 
-        console.log(info)
 
         // check if tcp client is related to some
         // already existing recognized peer
