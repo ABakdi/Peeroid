@@ -200,24 +200,29 @@ _eventBus.addEventListener('begin-incoming-file', (id, fileName, chunk)=>{
 })
 
 // recieving data
-_eventBus.addEventListener('writing-file', (fileName, id)=>{
+_eventBus.addEventListener('incoming-file-chunk', (id, fileName)=>{
     check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'direction': 'incoming'}, null)
 })
 
 // recieving data
-_eventBus.addEventListener('end-of-file', (id, fileName)=>{
+_eventBus.addEventListener('end-incoming-file', (id, fileName)=>{
   check_and_send('transfer-complete', {'id': id, 'fileName': fileName, 'direction': 'incoming'}, null)
 })
 
+// sending file
+_eventBus.addEventListener('begin-ougoing-file', (id, fileName)=>{
+  check_and_send('transfer-begins', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
+})
+
 // sending data
-_eventBus.addEventListener('file-chunk', (id, fileName, chunk)=>{
+_eventBus.addEventListener('outgoing-file-chunk', (id, fileName, chunk)=>{
   check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
   fileName = fileName.split('/').at(-1)
   _linker.tcpSend(id, '#echo', {'fileName': fileName, 'chunk': chunk}, '__File')
 })
 
 // sending data
-_eventBus.addEventListener('file-end', (id, fileName)=>{
+_eventBus.addEventListener('end-outgoing-file', (id, fileName)=>{
   check_and_send('transfer-complete', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
   fileName = fileName.split('/').at(-1)
   _linker.tcpSend(id, '#echo', {'fileName': fileName, 'chunk': '__END_OF_FILE'}, '__File')
