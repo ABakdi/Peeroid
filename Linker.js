@@ -107,12 +107,15 @@ class Linker{
 
     client.setEncoding('utf8')
 
-    // When receive server send back data.
+    let preData = ''
     client.on('data', (data)=>{
-      data = data.toString().split('/end*msg/')
-      console.log('data:   ')
-      console.log(data)
-      data.pop()
+      data = preData.concat(data.toString()).split('/end*msg/')
+      try{
+        JSON.parse(packet)
+        preData = ''
+      }catch(e){
+        preData = data.pop()
+      }
       data.forEach((packet)=>{
         console.log(packet)
         packet = JSON.parse(packet)

@@ -178,13 +178,21 @@ class Peer{
         this.eventBus.Emit('tcp-client', {'id': peer.id, 'name': peer.name, ...remote_client})
 
         // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
+        // perData: the last chunk of data after splitting by
+        // the ending directive /end*msg/ will be stored here
+        // if it is not complete, later it will be concatinated
+        // with the new data and the process will repeat each time
+        // data is recieved
+        let preData = ''
         client.on('data',(data)=>{
-          data = data.toString().split('/end*msg/')
-          data.pop()
-          console.log('data:   ')
-          console.log(data)
+          data = preData.concat(data.toString()).split('/end*msg/')
+          try{
+            JSON.parse(packet)
+            preData = ''
+          }catch(e){
+            preData = data.pop()
+          }
           data.forEach((packet)=>{
-            console.log(packet)
             packet = JSON.parse(packet)
             // calculate keyStore ID
             const ID = Hash(`${peer.address}:${peer.port}`)

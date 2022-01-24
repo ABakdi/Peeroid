@@ -175,7 +175,6 @@ function excute_command(command){
 
             try{
                 peerID = peers[Number(cmd[2])-1].id
-                console.log('prt: ' + protocol)
                 send_to_peeroid = {'command': 'send', 'param':{'id': peerID, 'payload': cmd[3], 'protocol': protocol}}
                 peer_log[Number(cmd[2])-1].appendContent('^G' + cmd[3]+ "\n")
             }catch(e){

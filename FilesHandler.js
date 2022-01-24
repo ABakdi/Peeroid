@@ -25,18 +25,19 @@ class FilesHandler{
 
   removeReadFile(id, fileName){
     this.readFileStreams = this.readFileStreams.filter((f)=>{
-      return (fileName ==f.fileName && f.id == id)
+      return !(fileName ==f.fileName && f.id == id)
     })
   }
 
   removeWriteFile(id, fileName){
     this.writeFileStreams = this.writeFileStreams.filter((f)=>{
-      return (fileName ==f.fileName && f.id == id)
+      return !(fileName ==f.fileName && f.id == id)
     })
   }
 
   newChunk(id, fileName, chunk){
-    let file = this.getWriteFile(fileName)
+    let file = this.getWriteFile(id, fileName)
+    console.log('FILE:? ', file)
     if(file){
       // check end of file
       if(chunk == '__END_OF_FILE'){

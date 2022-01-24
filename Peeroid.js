@@ -31,7 +31,6 @@ const server = new WebSocketServer({port: sockPort})
 server.on('connection', client =>{
 
   if(!peeroidClient){
-    console.log('pclient')
     peeroidClient = client
     let peerID = null
     peeroidClient.on('message', message =>{
@@ -68,12 +67,11 @@ server.on('connection', client =>{
             case 'udp':
               break
             case 'file':
-              _files_handler.readFile(msg.param.payload, peerID)
+              _files_handler.readFile(peerID, msg.param.payload)
               break
           }
           break
       }
-        console.log(msg)
     })
   }
   else{
@@ -113,7 +111,6 @@ function check_and_send(event, info, data){
     }
     msg = JSON.stringify(msg)
     peeroidClient.send(msg)
-    console.log(msg)
   }
 }
 
@@ -185,7 +182,6 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
 _eventBus.addEventListener('tcp-data', (info, data)=>{
   // send to peeriod-clients
   // if one is connected
-  console.log(info, data)
   if(info.header == '__File'){
     _files_handler.newChunk(info.id, data.fileName, data.chunk)
   }else{
@@ -210,7 +206,7 @@ _eventBus.addEventListener('end-incoming-file', (id, fileName)=>{
 })
 
 // sending file
-_eventBus.addEventListener('begin-ougoing-file', (id, fileName)=>{
+_eventBus.addEventListener('begin-outgoing-file', (id, fileName)=>{
   check_and_send('transfer-begins', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
 })
 
