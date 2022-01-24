@@ -81,7 +81,7 @@ class Linker{
 
     let options = {
       'address': peer.address,
-      'port': peer.port
+      'port': peer.port,
     }
 
     const client = net.createConnection(options, ()=>{
@@ -109,10 +109,20 @@ class Linker{
 
     // When receive server send back data.
     client.on('data', (data)=>{
-      data = JSON.parse(data.toString())
-      const ID = Hash(`${peer.address}:${peer.port}`)
-      data = this.keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
-      this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name}, data)
+      data = data.toString().split('/end*msg/')
+      console.log('data:   ')
+      console.log(data)
+      data.pop()
+      data.forEach((packet)=>{
+        console.log(packet)
+        packet = JSON.parse(packet)
+        // calculate keyStore ID
+        const ID = Hash(`${peer.address}:${peer.port}`)
+        let header = packet.header
+        // decrypt data body
+        packet = this.keyStore.symmetricDecrypt(ID, packet.tail.stamp, packet.body)
+        this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name, 'header': header}, packet)
+      })
     })
 
     // When connection disconnected.
@@ -154,7 +164,13 @@ class Linker{
         'stamp': stamp
       }
     }
+    console.log('sending ......')
+    console.log(msg)
     msg = JSON.stringify(msg)
+    // add ending directive to msg
+    // to prevent pecket sticking
+    msg = msg.concat('/end*msg/')
+
     peer.tcpSocket.write(msg)
   }
 

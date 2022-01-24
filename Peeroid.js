@@ -3,8 +3,9 @@ import Discover from './Discover.js'
 import Linker from './Linker.js'
 import keyStore from './keyStore.js'
 import eventBus from './eventBus.js'
-import terminal from 'terminal-kit';
+import terminal from 'terminal-kit'
 import requests from './requests.js'
+import FilesHandler from './FilesHandler.js'
 import {WebSocketServer} from 'ws'
 const {terminal: term} = terminal;
 const name = process.argv[2],
@@ -19,6 +20,7 @@ const _keyStore = new keyStore()
 const _requests = new requests()
 const _discovery = new Discover(peer.udpSocket, peer.id, name)
 const _linker = new Linker(peer.udpSocket, peer.id, name)
+const _files_handler = new FilesHandler(_eventBus)
 
 // will send commands
 // and recieves updates
@@ -56,10 +58,19 @@ server.on('connection', client =>{
 
         case 'send':
           peerID = msg.param.id
-          let payload = {
-            'payload': msg.param.payload
+          switch(msg.param.protocol){
+            case 'tcp':
+              let payload = {
+                'payload': msg.param.payload
+              }
+              _linker.tcpSend(peerID, '#echo', payload)
+              break
+            case 'udp':
+              break
+            case 'file':
+              _files_handler.readFile(msg.param.payload, peerID)
+              break
           }
-          _linker.tcpSend(peerID, '#echo', payload)
           break
       }
         console.log(msg)
@@ -75,7 +86,8 @@ server.on('connection', client =>{
 // use the same event bus and keystrore for
 // discovery link and peer in order
 // to integrate every thing together
-// this not necessary but it is what I will use
+// this not particularly easy to understand later
+// but it is what I will use willing to take that risk
 // here
 
 _discovery._eventBus = _eventBus
@@ -162,14 +174,55 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
   // the date in case of a file or someting
   // send to peeriod-clients
   // if one is connected
-  check_and_send('udp-data', info, data)
+  if(data.header == '__File'){
+    let fileName = data.name
+    _files_handler.newChunk(fileName, data.chunk)
+  }else{
+    check_and_send('udp-data', info, data)
+  }
 })
 
 _eventBus.addEventListener('tcp-data', (info, data)=>{
   // send to peeriod-clients
   // if one is connected
-  check_and_send('tcp-data', info, data)
+  console.log(info, data)
+  if(info.header == '__File'){
+    _files_handler.newChunk(info.id, data.fileName, data.chunk)
+  }else{
+    check_and_send('tcp-data', info, data)
+  }
 })
+
+// receiving data
+_eventBus.addEventListener('begin-incoming-file', (id, fileName, chunk)=>{
+  _files_handler.newFile(id, fileName, chunk)
+  check_and_send('transfer-begins', {'id': id, 'fileName': fileName, 'direction': 'incoming'}, null)
+})
+
+// recieving data
+_eventBus.addEventListener('writing-file', (fileName, id)=>{
+    check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'direction': 'incoming'}, null)
+})
+
+// recieving data
+_eventBus.addEventListener('end-of-file', (id, fileName)=>{
+  check_and_send('transfer-complete', {'id': id, 'fileName': fileName, 'direction': 'incoming'}, null)
+})
+
+// sending data
+_eventBus.addEventListener('file-chunk', (id, fileName, chunk)=>{
+  check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
+  fileName = fileName.split('/').at(-1)
+  _linker.tcpSend(id, '#echo', {'fileName': fileName, 'chunk': chunk}, '__File')
+})
+
+// sending data
+_eventBus.addEventListener('file-end', (id, fileName)=>{
+  check_and_send('transfer-complete', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
+  fileName = fileName.split('/').at(-1)
+  _linker.tcpSend(id, '#echo', {'fileName': fileName, 'chunk': '__END_OF_FILE'}, '__File')
+})
+
 
 //start
 peer.Start(port)

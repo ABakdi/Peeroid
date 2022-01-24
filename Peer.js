@@ -179,12 +179,20 @@ class Peer{
 
         // when tcp data is recieved we emmit 'tcp-data' with (id, data) the id of the client end the data recieved
         client.on('data',(data)=>{
-          data = JSON.parse(data.toString())
-          // calculate keyStore ID
-          const ID = Hash(`${peer.address}:${peer.port}`)
-          // decrypt data body
-          data = this.keyStore.symmetricDecrypt(ID, data.tail.stamp, data.body)
-          this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name}, data)
+          data = data.toString().split('/end*msg/')
+          data.pop()
+          console.log('data:   ')
+          console.log(data)
+          data.forEach((packet)=>{
+            console.log(packet)
+            packet = JSON.parse(packet)
+            // calculate keyStore ID
+            const ID = Hash(`${peer.address}:${peer.port}`)
+            let header = packet.header
+            // decrypt data body
+            packet = this.keyStore.symmetricDecrypt(ID, packet.tail.stamp, packet.body)
+            this.eventBus.Emit('tcp-data', {'id': peer.id, 'name': peer.name, 'header': header}, packet)
+          })
         })
 
         client.on('end', ()=>{

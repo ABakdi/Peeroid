@@ -24,12 +24,6 @@ let text = new TextBox({
     height: term.height,
 })
 
-// generate empty table with
-// number of rows depending on the terminal height
-let row_num = parseInt((term.height/2 -1)/2)
-let content = []
-for(let i = 0; i < row_num; i++)
-    content.push(['', '', '', ''])
 
 function make_table(header){
     // generate empty table with
@@ -38,7 +32,7 @@ function make_table(header){
     let content = []
     // add header to table
     content.push(header)
-    let empty_row = new Array(4).fill(' ')
+    let empty_row = new Array(header.length).fill(' ')
     for(let i = 0; i < row_num-1; i++){
         content.push(empty_row)
     }
@@ -76,24 +70,38 @@ let search_table = new TextTable(
     }
 )
 search_table.hide()
-let peers_table = new TextTable(
-  {
-    cellContents: content,
+
+let p_log0 = new TextBox({
     parent: doc,
     x: term.width/2,
     y: term.height/2,
-    hasBorder: true,
+    scrollable: true,
+    hasVScrollBar: true,
+    scrollY: 0,
+    extraScrolling: true,
     contentHasMarkup: true,
     textAttr: { bgColor: 'default' },
-    width: term.width/2,
-    height: term.height/2 - 1,
-    fit: true   // Activate all expand/shrink + wordWrap
-  }
-)
+    width: term.width/4,
+    height: term.height/2,
+})
+
+let p_log1 = new TextBox({
+    parent: doc,
+    x: term.width/4,
+    y: term.height/2,
+    scrollable: true,
+    hasVScrollBar: true,
+    scrollY: 0,
+    extraScrolling: true,
+    contentHasMarkup: true,
+    textAttr: { bgColor: 'default' },
+    width: term.width/4,
+    height: term.height/2,
+})
+
+let peer_log = [p_log0, p_log1]
 
 function delete_handler(){
-    // term.left(1)
-    // term.delete(1)
     text.textBuffer.backDelete(1)
     command = command.substring(0, cursorIndex-1)+
         command.substring(cursorIndex)
@@ -115,10 +123,6 @@ function history_handler(dir){
     }
 
     if(historyIndex >= 0 && historyIndex < history.length){
-        // term.deleteLine()
-        // term.column(0)
-        // term.bold.green("> "+command)
-        // FIXED
         text.textBuffer.moveToEndOfLine()
         text.textBuffer.backDelete(command.length)
         command = history[historyIndex]
@@ -161,6 +165,9 @@ function excute_command(command){
                 case 'udp':
                     protocol = 'udp'
                     break
+                case 'file':
+                    protocol = 'file'
+                    break
                 default:
                     text.appendContent('\RError: ^B no such protocol: ^R' + cmd[1])
                     Ycursor = Ycursor + 1
@@ -168,7 +175,9 @@ function excute_command(command){
 
             try{
                 peerID = peers[Number(cmd[2])-1].id
-                send_to_peeroid = {'command': 'send', 'param':{'id': peerID, 'payload': cmd[3]}}
+                console.log('prt: ' + protocol)
+                send_to_peeroid = {'command': 'send', 'param':{'id': peerID, 'payload': cmd[3], 'protocol': protocol}}
+                peer_log[Number(cmd[2])-1].appendContent('^G' + cmd[3]+ "\n")
             }catch(e){
                 text.appendContent('\n^RError: ^B parameter must be a number ^G*shortcut*, got: ' + cmd[2])
                 Ycursor = Ycursor + 1
@@ -205,9 +214,6 @@ function excute_command(command){
         break
 
         default:
-            // term.red('\nError:')
-            // term.blue(' no such command')
-            // term.green(cmd)
             text.appendContent('\n^RError: ^Bno such command ^G' + cmd[0])
             Ycursor = Ycursor + 1
     }
@@ -239,7 +245,6 @@ term.on('key', function(key, matches, data){
         case 'LEFT':
             if(cursorIndex == 0)
                 break
-            //term.left(1)
             text.textBuffer.moveLeft()
             cursorIndex = cursorIndex - 1
             Xcursor = Xcursor - 1
@@ -318,6 +323,14 @@ let found = [],
 let peers = [],
     peers_index = 0
 
+function get_peer_index(id){
+    for(let i = 0; i<peers.length; i++){
+        if(peers[i].id == id)
+            return i
+    }
+    return false
+}
+
 peeriod_client.on('message', (msg)=>{
     // recive updates from peeriod daemon
     msg = JSON.parse(msg.toString())
@@ -347,17 +360,19 @@ peeriod_client.on('message', (msg)=>{
             break
         case 'peer-connected':
             peers.push({'id': msg.info.id, 'name': msg.info.name})
-            if(peers_index < 4){
-                peers_table.setCellContent(0, peers_index, msg.info.name)
-                peers_table.redraw()
+            if(peers_index < 2){
+                peer_log[peers_index].appendContent("^Y" + msg.info.id + "\n^Y" + msg.info.name+ "\n^GConnected\n")
                 term.moveTo(Xcursor, Ycursor)
             }
             peers_index = peers_index + 1
             break
 
         case 'tcp-data':
-            peers_table.setCellContent(1, 0, msg.data.payload)
-            peers_table.redraw()
+        case 'udp-data':
+            let index = get_peer_index(msg.info.id)
+            if(index < 2){
+                peer_log[index].appendContent(msg.data.payload + "\n")
+            }
             term.moveTo(Xcursor, Ycursor)
             break
     }
