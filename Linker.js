@@ -5,6 +5,7 @@ import keyStore from './keyStore.js'
 import Discover from './Discover.js'
 import eventBus from './eventBus.js'
 import Requests from './requests.js'
+import { isArray } from 'util'
 class Linker{
   constructor(udpSocket, id, name){
     this.udpSocket = udpSocket
@@ -109,7 +110,8 @@ class Linker{
 
     let preData = ''
     client.on('data', (data)=>{
-      data = preData.concat(data.toString()).split('/end*msg/')
+      data = preData.concat(data.toString())
+      data = data.split('/end*msg/')
       try{
         JSON.parse(packet)
         preData = ''
@@ -117,7 +119,6 @@ class Linker{
         preData = data.pop()
       }
       data.forEach((packet)=>{
-        console.log(packet)
         packet = JSON.parse(packet)
         // calculate keyStore ID
         const ID = Hash(`${peer.address}:${peer.port}`)
@@ -135,7 +136,6 @@ class Linker{
 
     /*
     client.on('timeout', function () {
-      console.log('Client connection timeout. ')
     })
     */
 
@@ -167,8 +167,6 @@ class Linker{
         'stamp': stamp
       }
     }
-    console.log('sending ......')
-    console.log(msg)
     msg = JSON.stringify(msg)
     // add ending directive to msg
     // to prevent pecket sticking

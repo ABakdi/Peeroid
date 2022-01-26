@@ -36,7 +36,7 @@ server.on('connection', client =>{
     peeroidClient.on('message', message =>{
       // convert message to json
       let msg = JSON.parse(message.toString())
-
+      // console.log(msg)
       // find out what command is being
       // given and act accordingly
       switch(msg.command){
@@ -110,6 +110,7 @@ function check_and_send(event, info, data){
       'data': data
     }
     msg = JSON.stringify(msg)
+    // console.log(msg)
     peeroidClient.send(msg)
   }
 }

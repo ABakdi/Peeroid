@@ -1,5 +1,8 @@
 import fs, { readFile } from 'fs'
 
+import pkg from "tweetnacl-util"
+const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64} = pkg
+
 class FilesHandler{
   constructor(eventBus){
     this.writeFileStreams = []
@@ -12,13 +15,13 @@ class FilesHandler{
   }
 
   getWriteFile(id, fileName){
-    this.writeFileStreams.find((f)=>{
+    return this.writeFileStreams.find((f)=>{
       return (fileName ==f.fileName && f.id == id)
     })
   }
 
   getReadFile(id, fileName){
-    this.readFileStreams.find((f)=>{
+    return this.readFileStreams.find((f)=>{
       return (fileName ==f.fileName && f.id == id)
     })
   }
@@ -37,7 +40,6 @@ class FilesHandler{
 
   newChunk(id, fileName, chunk){
     let file = this.getWriteFile(id, fileName)
-    console.log('FILE:? ', file)
     if(file){
       // check end of file
       if(chunk == '__END_OF_FILE'){
@@ -46,6 +48,7 @@ class FilesHandler{
       }else{
         // write chunk to file
         this.eventBus.Emit('incoming-file-chunk', id, fileName)
+        chunk = decodeBase64(chunk)
         file.stream.write(chunk)
       }
     }else{
@@ -54,18 +57,18 @@ class FilesHandler{
   }
 
   newFile(id, fileName, chunk){
-      let stream = fs.createWriteStream(`${this.dir}/${fileName}`)
-      stream.write(chunk)
+    let stream = fs.createWriteStream(`${this.dir}/${fileName}`, 'binary')
+    chunk = decodeBase64(chunk)
+    stream.write(chunk)
       this.writeFileStreams.push({
+        'id': id,
         'fileName': fileName,
         'stream': stream,
-        'id': id,
       })
   }
 
   readFile(id, fileName){
-    let stream = fs.createReadStream(`${fileName}`, {highWaterMark: 512})
-    stream.setEncoding('utf8')
+    let stream = fs.createReadStream(`${fileName}`)
 
     this.readFileStreams.push({
       'id': id,
@@ -78,13 +81,14 @@ class FilesHandler{
     })
 
     stream.on('data', (chunk)=>{
-      this.eventBus.Emit('outgoing-file-chunk', id, fileName, chunk.toString())
+      chunk = encodeBase64(chunk)
+      this.eventBus.Emit('outgoing-file-chunk', id, fileName, chunk)
     })
 
     stream.on('end', ()=>{
       this.eventBus.Emit('end-outgoing-file', id, fileName)
       stream.close()
-      this.removeReadFile(fileName, id)
+      this.removeReadFile(id, fileName)
     })
   }
 }

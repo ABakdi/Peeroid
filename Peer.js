@@ -185,7 +185,8 @@ class Peer{
         // data is recieved
         let preData = ''
         client.on('data',(data)=>{
-          data = preData.concat(data.toString()).split('/end*msg/')
+          data = preData.concat(data.toString())
+          data = data.split('/end*msg/')
           try{
             JSON.parse(packet)
             preData = ''
