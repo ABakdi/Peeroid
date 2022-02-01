@@ -17,6 +17,10 @@ class Requests{
     this.remoteRequests = []
   }
 
+  get remoteReq(){
+    return this.remoteRequests
+  }
+
   #getRequest(id){
     return this.requests.find((req)=> req.id == id)
   }

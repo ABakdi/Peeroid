@@ -71,6 +71,17 @@ server.on('connection', client =>{
               break
           }
           break
+
+        case 'get-requests':
+          let req = _requests.remoteReq
+          check_and_send('requests-list', {'requests': req}, null)
+          break
+
+        case 'get-connections':
+          let peers = _linker.peers
+          check_and_send('peers-list', {'peers': peers}, null)
+          break
+
       }
     })
   }

@@ -14,6 +14,10 @@ class Linker{
     this.name = name
   }
 
+  get peers(){
+    return this.Peers.peers
+  }
+
   set _eventBus(bus){
     if(bus instanceof eventBus){
       this.eventBus = bus
