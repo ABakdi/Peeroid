@@ -97,10 +97,12 @@ class peeroid_client{
 }
 
 export default peeroid_client
-
+/*testing*/
+/*
 let c = new peeroid_client()
 c.connect('127.0.0.1', 8081)
 setTimeout(async ()=>{
   let r = await c.requests
   console.log(r)
 }, 2000)
+*/
