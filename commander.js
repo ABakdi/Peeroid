@@ -23,6 +23,8 @@ class Commander{
         'default_value': 'table'
       },
 
+      'search':{},
+
       'connect': {
         'params': {
           'name': [],
@@ -110,7 +112,6 @@ class Commander{
       // for all default values
       _default.forEach((val)=>{
         // check if such value is allowed
-        console.log(cmd.command, default_value)
         if(this.defaults[cmd.command].params[default_value].includes(val))
           cmd.params[default_value].push(val)
         else
@@ -158,6 +159,27 @@ class Commander{
           throw new Error(`no such ${default_param}: ${_param}`)
         }
       }
+    }
+
+    switch(cmd.command){
+      case 'send':
+        if(!cmd.input)
+          throw new Error('send: send what? must specify a message or a valid file path.')
+        if(!(cmd.params.id && cmd.params.name))
+          throw new Error('send: to whom? must specify a connected peer(s) name or id.')
+        if(!cmd.params.protocol)
+          throw new Error('send: how? must specify a protocole tcp, udp or file.')
+        break
+
+      case 'accept':
+        if(!(cmd.params.name && cmd.params.id && cmd.params.name))
+          throw new Error('accept: must specify request(s) or peer(s) name/id')
+        break
+
+      case 'show':
+        if(!cmd.params.table)
+          throw new Error('show: specify table; search, requests ....')
+        break
     }
     return cmd
   }

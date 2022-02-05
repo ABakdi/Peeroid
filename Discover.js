@@ -186,6 +186,9 @@ class Discover{
     })
 
   }
+  getfoundPeerByName(name){
+    return this.echoList.find((peer)=> peer.name == name)
+  }
   
 
   Ping(address, port){

@@ -258,7 +258,7 @@ class Peer{
         ID = Hash(`${remote.address}:${remote.port}`)
         body = this.keyStore.symmetricDecrypt(ID, message.tail.stamp, message.body)
         // message.body = body
-        this.Requests.addRemoteRequest(body.id)
+        this.Requests.addRemoteRequest(body.id, body.name)
         this.eventBus.Emit('connection-request', body.id, body.name)
         break
 

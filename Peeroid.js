@@ -28,11 +28,11 @@ let peeroidClient = null
 
 // peeriod server
 const server = new WebSocketServer({port: sockPort})
-server.on('connection', client =>{
-
+server.on('connection', (client) =>{
+  console.log('P-Client')
   if(!peeroidClient){
     peeroidClient = client
-    let peerID = null
+    let peerIDs = []
     peeroidClient.on('message', message =>{
       // convert message to json
       let msg = JSON.parse(message.toString())
@@ -41,35 +41,73 @@ server.on('connection', client =>{
       // given and act accordingly
       switch(msg.command){
         case 'connect':
-          peerID = msg.param.id
-          let keyStamp = '#echo'
-          _linker.requestConnection(peerID, "#echo")
+          if(msg.param.id)
+            peerIDs = msg.param.id
+          if(msg.param.name){
+            msg.param.name.forEach((name)=>{
+              let id = _discovery.getFoundPeerByName.id
+              if(id)
+                peerIDs.push(id)
+            })
+          }
+          peerIDs.forEach((id)=>{
+            let keyStamp = '#echo'
+            _linker.requestConnection(id, "#echo")
+          })
+          peerIDs = []
           break
-        case 'local-search':
+        case 'search':
           _discovery.SearchLocalNetwork([6562, 6563])
           break
 
         case 'accept':
-          peerID = msg.param.id
-          _requests.resolveRmoteRequest(peerID, 'accepted')
-          _linker.tcpConnect(peerID)
+          if(msg.param.id)
+            peerIDs = msg.param.id
+          if(msg.param.name){
+            msg.param.name.forEach((name)=>{
+              let id = _requests.getRemoteRequestByName(name).id
+              if(id)
+                peerIDs.push(id)
+            })
+          }
+          peerIDs.forEach((id)=>{
+            _requests.resolveRmoteRequest(id, 'accepted')
+            _linker.tcpConnect(id)
+          })
+          peerIDs = []
           break
 
         case 'send':
-          peerID = msg.param.id
+          if(msg.param.id)
+            peerIDs = msg.param.id
+          if(msg.param.name){
+            msg.param.name.forEach((name)=>{
+              let id = _linker.Peers.getPeersByName(name).id
+              if(id)
+                peerIDs.push(id)
+            })
+          }
+          let payload = {
+            'payload': msg.param.input
+          }
           switch(msg.param.protocol){
             case 'tcp':
-              let payload = {
-                'payload': msg.param.payload
-              }
-              _linker.tcpSend(peerID, '#echo', payload)
+              peerIDs.forEach((id)=>{
+                _linker.tcpSend(id, '#echo', payload)
+              })
               break
             case 'udp':
+              peerIDs.forEach((id)=>{
+                _linker.udpSend(id, '#echo', payload)
+              })
               break
             case 'file':
-              _files_handler.readFile(peerID, msg.param.payload)
+              peerIDs.forEach((id)=>{
+                _files_handler.readFile(id, payload)
+              })
               break
           }
+          peerIDs = null
           break
 
         case 'get-requests':
@@ -86,7 +124,7 @@ server.on('connection', client =>{
     })
   }
   else{
-    client.send(JSON.stringify({'peeriod-client error':
+    client.send(JSON.stringify({'peeriod-client-error':
                                 'cant connect multple peeriod-clients, one is already running.'}))
     client.close()
   }

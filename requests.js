@@ -21,6 +21,10 @@ class Requests{
     return this.remoteRequests
   }
 
+  getRemoteRequestByName(name){
+    return this.requests.find((req)=> req.name == name)
+  }
+
   #getRequest(id){
     return this.requests.find((req)=> req.id == id)
   }
@@ -45,9 +49,10 @@ class Requests{
       return req.status
   }
 
-  addRequest(id){
+  addRequest(id, name){
     const req = {
       'id': id,
+      'name': name,
       'status' : 'waiting'
     }
     this.requests.push(req)

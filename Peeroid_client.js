@@ -3,7 +3,7 @@ const {terminal: term} = terminal;
 import EventEmitter from 'events'
 import WebSocket from 'ws'
 
-class peeroid_client{
+class Peeroid_client{
   constructor(){
     this.eventBus = new EventEmitter()
     this.client = null
@@ -12,8 +12,10 @@ class peeroid_client{
   connect(host, port){
     const url = `ws://${host}:${port}`
     try{
-      this.client= new WebSocket(url)
-      this.client.on('open', ()=> this.eventBus.emit('open'))
+      this.client = new WebSocket(url)
+      this.client.on('open', ()=> {
+        this.eventBus.emit('open')
+      })
     }catch(e){
       throw new Error('Error: could\'t connect to peeriod'+ e)
     }
@@ -95,7 +97,7 @@ class peeroid_client{
   }
 }
 
-export default peeroid_client
+export default Peeroid_client
 /*testing*/
 /*
 let c = new peeroid_client()

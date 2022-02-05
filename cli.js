@@ -1,5 +1,7 @@
 import terminal from 'terminal-kit';
 const {terminal: term, TextTable, TextBox} = terminal;
+import Peeroid_client from './Peeroid_client.js'
+import Commander from './commander.js'
 var cursorIndex = 0,
     command = '',
     history = [],
@@ -8,7 +10,7 @@ var Xcursor = 0,
     Ycursor = 0
 
 let doc = term.createDocument()
-
+let commander  = new Commander()
 // text box for writing commands
 let text = new TextBox({
     parent: doc,
@@ -133,70 +135,38 @@ function history_handler(dir){
 }
 
 function excute_command(command){
-    // if command is empty do nothing
-    if(command == "")
+    let cmd = null
+    // convert text command to object
+    // if command syntax is not valid
+    // show exeption
+    try{
+        cmd = commander.refactor_command(command)
+    }catch(e){
+        text.appendContent(`\n^R${e}`)
+        Ycursor = Ycursor + 1
         return
-
-    let cmd = command.split(' ')
-    let send_to_peeroid = null
-    let peerID = null
-    switch(cmd[0]){
+    }
+    let peerIDs = null
+    switch(cmd.command){
         case 'search':
-            send_to_peeroid = {'command': 'local-search'}
             break
         case 'connect':
-            try{
-                peerID = found[Number(cmd[1])-1].id
-                send_to_peeroid = {'command': 'connect', 'param':{'id': peerID}}
-                text.appendContent('\n^B request has been sent if peer: ^G'+ peerID +
-                                   '\n^Baccepts it will show up on the table')
-                Ycursor = Ycursor + 2
-            }catch(e){
-                text.appendContent('\n^RError: ^B parameter must be a number ^G*shortcut*, got: ' + cmd[1])
-                Ycursor = Ycursor + 1
-            }
-            break
+            text.appendContent(`\n^B request has been sent if peer(s): ^G'+ ${peerIDs}`+
+                               `\n^Baccepts it(they) will show up on the table`)
+            peeroid_client.command(cmd)
+            Ycursor = Ycursor + 2
         case 'send':
-            let protocol
-            switch(cmd[1]){
-                case 'tcp':
-                    protocol = 'tcp'
-                    break
-                case 'udp':
-                    protocol = 'udp'
-                    break
-                case 'file':
-                    protocol = 'file'
-                    break
-                default:
-                    text.appendContent('\RError: ^B no such protocol: ^R' + cmd[1])
-                    Ycursor = Ycursor + 1
-            }
-
-            try{
-                peerID = peers[Number(cmd[2])-1].id
-                send_to_peeroid = {'command': 'send', 'param':{'id': peerID, 'payload': cmd[3], 'protocol': protocol}}
-                peer_log[Number(cmd[2])-1].appendContent('^G' + cmd[3]+ "\n")
-            }catch(e){
-                text.appendContent('\n^RError: ^B parameter must be a number ^G*shortcut*, got: ' + cmd[2])
-                Ycursor = Ycursor + 1
-            }
-
+            peer_log[Number(cmd[2])-1].appendContent(`^G + ${cmd.input} \n`)
+            peeroid_client.command(cmd)
             break
         case 'accept':
-            try{
-                let peerID = requests[Number(cmd[1])-1].id
-                send_to_peeroid = {'command': 'accept', 'param':{'id': peerID}}
-                text.appendContent('\n^B Connecting to: ^G'+ peerID +
-                                   '\n^B peer will apear on table when connection is established')
-                Ycursor = Ycursor + 2
-            }catch(e){
-                text.appendContent('\n^RError: ^B parameter must be a number ^G*shortcut*, got: ' + cmd[1])
-                Ycursor = Ycursor + 1
-            }
+            text.appendContent(`\n^B Connecting to: ^G ${peerIDs}` +
+                               '\n^B peer(s) will apear on table when connection is established')
+            Ycursor = Ycursor + 2
+            peeroid_client.command(cmd)
             break
         case 'show':
-            switch(cmd[1]){
+            switch(cmd.params.table){
                 case 'search':
                     req_table.hide()
                     search_table.show()
@@ -205,22 +175,8 @@ function excute_command(command){
                     search_table.hide()
                     req_table.show()
                     break
-                default:
-                    text.appendContent('\n^RError: ^Bno such parameter for ^Gshow command ^G' + cmd[1])
-                    Ycursor = Ycursor + 1
             }
-            send_to_peeroid = null
         break
-
-        default:
-            text.appendContent('\n^RError: ^Bno such command ^G' + cmd[0])
-            Ycursor = Ycursor + 1
-    }
-
-    // send command to peeriod daemon
-    if(send_to_peeroid){
-        send_to_peeroid = JSON.stringify(send_to_peeroid)
-        peeriod_client.send(send_to_peeroid)
     }
 
 }
@@ -299,11 +255,10 @@ term.on('key', function(key, matches, data){
     
 })
 // connecting to Peeriod daemon
-import WebSocket from 'ws'
+let peeroid_client = new Peeroid_client()
 const port = process.argv[2]
-const url = `ws://127.0.0.1:${port}`
-const peeriod_client = new WebSocket(url)
-peeriod_client.on('open', ()=>{
+const host = '127.0.0.1'
+peeroid_client.on('open', ()=>{
     text.appendContent('^Bconnecting to Peeriod daemon....^Gconnected.'+
                     '\nyou can start commanding peeriod. Type ^Ghelp '+
                     'to list commands,\n^Ghelp command^ for command details.')
@@ -313,6 +268,7 @@ peeriod_client.on('open', ()=>{
     Xcursor = Xcursor + 3
 })
 
+peeroid_client.connect(host, port)
 let requests = [],
     req_index = 1
 
@@ -329,54 +285,55 @@ function get_peer_index(id){
     }
     return false
 }
-
-peeriod_client.on('message', (msg)=>{
-    // recive updates from peeriod daemon
-    msg = JSON.parse(msg.toString())
-    switch(msg.event){
-        case 'connection-request':
-            requests.push({'id' : msg.info.id, 'name': msg.info.name, 'timeout': 'inf'})
-            if(req_index < 8){
-                req_table.setCellContent(0, req_index, req_index)
-                req_table.setCellContent(1, req_index, msg.info.id)
-                req_table.setCellContent(2, req_index, msg.info.name)
-                req_table.setCellContent(3, req_index, 'inf   ')
-                req_table.redraw()
-                term.moveTo(Xcursor, Ycursor)
-            }
-            req_index = req_index + 1
-            break
-        case 'found-peer':
-            found.push({'id': msg.info.id, 'name': msg.info.name})
-            if(req_index < 8){
-                search_table.setCellContent(0, req_index, req_index)
-                search_table.setCellContent(1, req_index, msg.info.id)
-                search_table.setCellContent(2, req_index, msg.info.name)
-                search_table.redraw()
-                term.moveTo(Xcursor, Ycursor)
-            }
-            found_index = req_index + 1
-            break
-        case 'peer-connected':
-            peers.push({'id': msg.info.id, 'name': msg.info.name})
-            if(peers_index < 2){
-                peer_log[peers_index].appendContent("^Y" + msg.info.id + "\n^Y" + msg.info.name+ "\n^GConnected\n")
-                term.moveTo(Xcursor, Ycursor)
-            }
-            peers_index = peers_index + 1
-            break
-
-        case 'tcp-data':
-        case 'udp-data':
-            let index = get_peer_index(msg.info.id)
-            if(index < 2){
-                peer_log[index].appendContent(msg.data.payload + "\n")
-            }
-            term.moveTo(Xcursor, Ycursor)
-            break
+peeroid_client.on('connection-request', (id, name, timeout)=>{
+    if(req_index < 8){
+        req_table.setCellContent(0, req_index, req_index)
+        req_table.setCellContent(1, req_index, id)
+        req_table.setCellContent(2, req_index, name)
+        req_table.setCellContent(3, req_index, 'inf   ')
+        req_table.redraw()
+        term.moveTo(Xcursor, Ycursor)
     }
+    commander.add_to_accept(req_index, id, name)
+    req_index = req_index + 1
 })
 
+peeroid_client.on('found-peer', (id, name)=>{
+    if(req_index < 8){
+        search_table.setCellContent(0, req_index, req_index)
+        search_table.setCellContent(1, req_index, id)
+        search_table.setCellContent(2, req_index, name)
+        search_table.redraw()
+        term.moveTo(Xcursor, Ycursor)
+    }
+    commander.add_to_connect(id, name)
+    found_index = req_index + 1
+})
+
+peeroid_client.on('peer-connected', (id, name)=>{
+    if(peers_index < 2){
+        peer_log[peers_index].appendContent("^Y" + id + "\n^Y" + name+ "\n^GConnected\n")
+        term.moveTo(Xcursor, Ycursor)
+    }
+    commander.add_to_send(id, name)
+    peers_index = peers_index + 1
+})
+
+peeroid_client.on('tcp-data', (id, data)=>{
+    let index = get_peer_index(id)
+    if(index < 2){
+        peer_log[index].appendContent(data + "\n")
+    }
+    term.moveTo(Xcursor, Ycursor)
+})
+
+peeroid_client.on('udp-data', (id, data)=>{
+    let index = get_peer_index(id)
+    if(index < 2){
+        peer_log[index].appendContent(data + "\n")
+    }
+    term.moveTo(Xcursor, Ycursor)
+})
 term.grabInput()
 
 doc.redraw()
