@@ -33,10 +33,10 @@ class Peeroid_client{
           this.eventBus.emit('peer-connected', msg.info.id, msg.info.name)
           break
         case 'tcp-data':
-          this.eventBus.emit('tcp-data', msg.info.id, msg.info.data)
+          this.eventBus.emit('tcp-data', msg.info.id, msg.data)
           break
         case 'udp-data':
-          this.eventBus.emit('udp-data', msg.info.id, msg.info.data)
+          this.eventBus.emit('udp-data', msg.info.id, msg.data)
           break
         case 'requests-list':
           this.eventBus.emit('requests-list', msg.info.requests)
@@ -44,6 +44,8 @@ class Peeroid_client{
         case 'connections-list':
           this.eventBus.emit('connections-list', msg.info.connections)
           break
+        case 'tcp-data-sent':
+          this.eventBus.emit('tcp-data-sent', msg.info, msg.data)
       }
     })
   }

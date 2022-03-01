@@ -23,7 +23,8 @@ class Linker{
       this.eventBus = bus
       this.eventBus._addEvents(['tcp-data', 'tcp-end',
                                 'tcp-error','tcp-connected',
-                                'tcp-client','connection-request'])
+                                'tcp-client','connection-request',
+                               'tcp-data-sent', 'udp-data-sent'])
     }else{
       throw new Error('must be eventBus object')
     }
@@ -177,6 +178,7 @@ class Linker{
     msg = msg.concat('/end*msg/')
 
     peer.tcpSocket.write(msg)
+    this.eventBus.Emit('tcp-data-sent', id, json)
   }
 
   udpSend(id, stamp, json, header = "__Data"){

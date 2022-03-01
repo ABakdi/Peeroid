@@ -72,7 +72,7 @@ class Commander{
         return false
     // split command where there are "
     // then remove empty strings
-    // the command will be split in tow
+    // the command will be split in two
     // the command-parameters part and the input part
     // example =>
     // send p1 -id 123-456-789 -name p2 | I'am of the opinion that Carthage must be destroyed
@@ -165,14 +165,14 @@ class Commander{
       case 'send':
         if(!cmd.input)
           throw new Error('send: send what? must specify a message or a valid file path.')
-        if(!(cmd.params.id && cmd.params.name))
+        if(!(cmd.params.id || cmd.params.name))
           throw new Error('send: to whom? must specify a connected peer(s) name or id.')
         if(!cmd.params.protocol)
           throw new Error('send: how? must specify a protocole tcp, udp or file.')
         break
 
       case 'accept':
-        if(!(cmd.params.name && cmd.params.id && cmd.params.name))
+        if(!(cmd.params.name || cmd.params.id || cmd.params.request))
           throw new Error('accept: must specify request(s) or peer(s) name/id')
         break
 
@@ -199,7 +199,8 @@ let c = 'send -tcp -name p1 p2 "hello world"'
 c = 'send p1 p2 p3 -tcp "hello, SSSsup"'
 c = 'connect p4'
 c = 'accept -name p5'
-c = 'show requests'
+c = 'accept 23'
+//c = 'show requests'
 let r = cmd.refactor_command(c)
 console.log(r)
 */

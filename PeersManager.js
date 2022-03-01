@@ -21,7 +21,7 @@ class PeersManager{
     }
 
     getPeersByName(name){
-        return this.peers.filter(c => c.name == name)
+        return this.peers.find(c => c.name == name)
     }
 
     getPeerByAddress(address, port){

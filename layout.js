@@ -7,20 +7,124 @@ class layout{
     this.document = term.createDocument()
     this.scrollableGroups = {}
     this.Input_actions = {}
+    this.keyBoardContext = {}
     this.#start()
   }
 
+  setKeyBoardContext(name, markup){
+    if(!(name in this.boards))
+      throw new Error(`${name} does not exist`)
+
+    this.keyBoardContext = {
+      'name': name,
+      'currentLine': '',
+      'markup': markup ? markup: '',
+      'LifoIndex': 0
+    }
+  }
+
+
   #start(){
+    let hist = ''
     term.on('key', (key, matches, data)=>{
+      let contextName = this.keyBoardContext.name
+      let markup = this.keyBoardContext.markup
+      let c_line = this.keyBoardContext.currentLine
+      let x_cursor = this.boards[contextName].Xcursor
       switch(key){
         case 'CTRL_C':
           term.clear()
           process.exit()
           break
+        case 'LEFT':
+          if(this.boards[contextName].Xcursor > 2)
+            this.boards[contextName].Xcursor -= 1
+          break
+        case 'RIGHT':
+          if(this.boards[contextName].Xcursor < this.keyBoardContext.currentLine.length+2)
+            this.boards[contextName].Xcursor += 1
+          break
+        case 'UP':
+          // this code is not effecient
+          // but I perfer not to believe that
+          // FIXME
+          if(this.boards[contextName].inputs.length == 0)
+            break
+
+          if(this.keyBoardContext.LifoIndex < 0)
+            this.keyBoardContext.LifoIndex = 1
+
+          if(this.keyBoardContext.LifoIndex >= this.boards[contextName].inputs.length)
+            this.keyBoardContext.LifoIndex = this.boards[contextName].inputs.length - 1
+
+          this.boards[contextName].ref.textBuffer.moveToEndOfLine()
+          this.delete_content(contextName, this.keyBoardContext.currentLine.length)
+          this.boards[contextName].Xcursor = 2
+          this.insert_content(contextName,
+                              markup.concat( this.boards[contextName].inputs[this.keyBoardContext.LifoIndex]))
+          this.keyBoardContext.currentLine = this.boards[contextName].inputs[this.keyBoardContext.LifoIndex]
+          this.keyBoardContext.LifoIndex += 1
+          break
+        case 'DOWN':
+          // FIXME
+          if(this.boards[contextName].inputs.length == 0)
+            break
+
+          if(this.keyBoardContext.LifoIndex >= this.boards[contextName].inputs.length &&
+            this.boards[contextName].inputs.length > 1)
+            this.keyBoardContext.LifoIndex = this.boards[contextName].inputs.length - 2
+
+          if(this.keyBoardContext.LifoIndex < 0 || this.boards[contextName].inputs.length == 1)
+            this.keyBoardContext.LifoIndex = 0
+
+          this.boards[contextName].ref.textBuffer.moveToEndOfLine()
+          this.delete_content(contextName, this.keyBoardContext.currentLine.length)
+          this.boards[contextName].Xcursor = 2
+          this.insert_content(contextName,
+                              markup.concat( this.boards[contextName].inputs[this.keyBoardContext.LifoIndex]))
+          this.keyBoardContext.currentLine = this.boards[contextName].inputs[this.keyBoardContext.LifoIndex]
+          this.keyBoardContext.LifoIndex += -1
+          break
+        case 'BACKSPACE':
+          if(this.boards[contextName].Xcursor > 2){
+            let line = this.keyBoardContext.currentLine,
+                X = this.boards[contextName].Xcursor - 2
+            this.keyBoardContext.currentLine = line.slice(0, X-1) + line.slice(X)
+            this.boards[contextName].ref.textBuffer.moveToEndOfLine()
+            this.delete_content(contextName, this.keyBoardContext.currentLine.length+1)
+            this.insert_content(contextName, markup.concat(this.keyBoardContext.currentLine))
+          }
+          break
+        case 'ENTER':
+          this.insert_content(contextName, '\n')
+          this.boards[contextName].Xcursor = 0
+
+          if(this.keyBoardContext.currentLine)
+            this.boards[contextName].inputs.unshift(this.keyBoardContext.currentLine)
+
+          if('ENTER' in this.Input_actions)
+            this.Input_actions[key](this.keyBoardContext.currentLine)
+
+          this.keyBoardContext.currentLine = ''
+          break
         default:
-          if(key in this.Input_actions)
+          if(key in this.Input_actions){
             this.Input_actions[key]()
+            return
+          }
+
+          let char = Buffer.isBuffer(data.code) ? data.code : String.fromCharCode(data.code)
+          char = char.toString()
+          if(contextName && char.length == 1){
+            this.keyBoardContext.currentLine = c_line.substr(0, x_cursor-2).concat(char).concat(c_line.substr(x_cursor-2))
+            this.boards[contextName].ref.textBuffer.moveToEndOfLine()
+            this.boards[contextName].ref.textBuffer.backDelete(c_line.length)
+            this.insert_content(contextName, markup.concat(this.keyBoardContext.currentLine))
+            this.boards[contextName].Xcursor = x_cursor + 1
+            this.boards[contextName].ref.redraw()
+          }
       }
+      term.moveTo(this.boards[contextName].Xcursor + 1, this.boards[contextName].Ycursor + 1)
     })
   }
 
@@ -43,15 +147,15 @@ class layout{
     return content
   }
 
-  add_inputAction(key, callback){
-    if(this.Input_actions[key])
-      throw new Error('${key} is already related to an action')
+  add_inputAction(key, callback, force=false){
+    if(key in this.Input_actions && !force)
+      throw new Error(`${key} is already related to an action`)
 
     this.Input_actions[key] = callback
   }
 
   new_table(name, header, height, width, x, y){
-    if(this.tables[name])
+    if(name in this.tables)
       throw new Error(`${name}: already exists`)
     let contents = this.#make_table(header, height)
     let table = new TextTable({
@@ -73,7 +177,7 @@ class layout{
       'ref': table,
       'header': header,
       'columns': header.length,
-      'rows': contents.length,
+      'rows': contents.length-1,
       'content': [],
       'contentIndex': 0,
       'tableIndex': 0,
@@ -82,12 +186,19 @@ class layout{
   }
 
   add_row(name, content){
-    if(!this.tables[name])
+    if(!(name in this.tables))
       throw new Error(`no such table ${name}`)
     if(!content.length == this.tables[name].columns)
       throw new Error(`row must have ${this.tables[name].columns}`
                       +`elements, got ${content.length}`)
     this.tables[name].content.push(content)
+    if(this.tables[name].tableIndex < this.tables[name].rows){
+      this.tables[name].tableIndex = this.tables[name].tableIndex + 1
+      for(let i = 0; i < content.length; i++){
+        this.tables[name].ref.setCellContent(i, this.tables[name].tableIndex, content[i])
+      }
+    }
+    this.tables[name].ref.redraw()
   }
 
   delete_row(name, identifier, value){
@@ -113,27 +224,55 @@ class layout{
     }
   }
 
-  fill_table(name, start, end, offset=0){
-    if(this.tables[name])
-      throw new Error(`${name}: already exists`)
+  scroll_table(tableName, step){
+    if(!(tableName in this.tables))
+      throw new Error(`${tableName}: does not exists`)
+    let content = this.tables[tableName].content
+    let contentIndex = this.tables[tableName].contentIndex
+    if(contentIndex + step < 0 || contentIndex + step + this.tables[tableName].rows > content.length)
+      return
+    this.fill_table(tableName, contentIndex + step, this.tables[tableName].rows)
+    this.tables[tableName].contentIndex = contentIndex + step
+    this.tables[tableName].ref.redraw()
+  }
 
-    if(offset > this.tables[name].columns)
+  fill_table(name, start, num, offset=0){
+    if(!(name in this.tables))
+      throw new Error(`${name}: does not exists`)
+
+    if(offset > this.tables[name].rows)
       throw new Error(`offset must be less than table columns (${this.tables[name].columns})`)
 
     if(start > this.tables[name].content.length || start < 0)
       throw new Error(`${name}: start out of bound`)
 
-    if(end < start)
-      throw new Error(`start < end ... WTF?`)
+    if(num < 0)
+      throw new Error(`${num}:  out of bound`)
 
-    if(end > this.tables[name].content.length || end < 0)
-      throw new Error(`${name}: end out of bound`)
+    let r = start+num > this.tables[name].content.length ? start + (this.tables[name].content.length - num) -1: start+num
 
-    for(let i = start; i <= end; i++){
-      for(let j = 0; j < this.tables[name].columns; j++){
-        this.tables[name].ref.setCellContent(start - i + offset, j, this.tables[name].content[i][j])
-      }
+    let j = offset
+    for(let i = start; i <= r && j < this.tables[name].rows; i++){
+      this.fill_row(name, j, this.tables[name].content[i])
+      j = j + 1
     }
+    this.tables[name].contentIndex = start
+  }
+
+  fill_row(tableName, rowIndex, rowContent){
+    if(!(tableName in this.tables))
+      throw new Error(`${name}: does not exists`)
+    // starts from 0
+    if(rowIndex > this.tables[tableName].ref.rows && rowIndex < 0)
+      throw new Error(`row index ${rowIndex} out of bound`)
+
+    if(!rowContent ||rowContent.length != this.tables[tableName].columns)
+      throw new Error(`row content length ${rowContent} isn't right`)
+
+    for(let i = 0; i < rowContent.length; i++)
+      this.tables[tableName].ref.setCellContent(i, rowIndex+1, rowContent[i])
+
+    this.tables[tableName].ref.redraw()
   }
 
   show_table(name){
@@ -160,13 +299,9 @@ class layout{
       parent: this.document,
       x: x,
       y: y,
-      scrollable: true,
-      hasVScrollBar: true,
-      scrollY: 0,
-      extraScrolling: true,
       contentHasMarkup: true,
       textAttr: { bgColor: 'default' },
-      width: progressBars? width : width/2,
+      width: progressBars? width/2 : width,
       height: height,
     })
     board.hide()
@@ -174,9 +309,9 @@ class layout{
     this.boards[name] = {
       'title': title,
       'ref': board,
-      'rows': [],
-      'startIndex': 0,
-      'columnIndex': 0,
+      'inputs': [], // LIFO
+      'Xcursor': 0,
+      'Ycursor': 0,
       'hidden': true,
       'pBarIndex': 0
     }
@@ -184,13 +319,33 @@ class layout{
       this.boards[name].progressBars = {}
   }
 
-  insert_content(boardName, content, x, y){
+  insert_content(boardName, content){
     if(!(boardName in this.boards))
       throw new Error(`board '${boardName}' does not exist`)
 
     let textBuffer = this.boards[boardName].ref.textBuffer
-    textBuffer.moveTo(x, y)
-    textBuffer.insert(content)
+    textBuffer.insert(content, true)
+    // seperate lines \n
+    content = content.split(/\n/)
+
+    // the new cursor coords after writing
+    if(content.length - 1 == 0)
+      this.boards[boardName].Xcursor += content.join('').split(/\^./).join('').length
+    else
+      this.boards[boardName].Xcursor = 0
+
+    this.boards[boardName].Ycursor += content.length - 1
+
+    this.boards[boardName].ref.redraw()
+  }
+
+  delete_content(boardName, n){
+    if(!(boardName in this.boards))
+      throw new Error(`board '${boardName}' does not exist`)
+
+    let textBuffer = this.boards[boardName].ref.textBuffer
+    this.boards[boardName].Xcursor -= n
+    textBuffer.backDelete(n)
     this.boards[boardName].ref.redraw()
   }
 
@@ -332,7 +487,7 @@ class layout{
       throw new Error(`no such table ${elName}`)
 
     if(!this.boards[elName] && type == 'board')
-      throw new Error(`no such group ${elName}`)
+      throw new Error(`no such board ${elName}`)
 
     this.scrollableGroups[grName].names.push(elName)
     this.scrollableGroups[grName].types.push(type)
@@ -353,19 +508,34 @@ class layout{
         this.hide_table(this.scrollableGroups[name].names[index])
         this.show_table(this.scrollableGroups[name].names[index + step])
         this.scrollableGroups[name].index = index + step
-        return true
+        return {'type': 'table', 'name': this.scrollableGroups[name].names[index + step]}
       }else if(type == 'board'){
         this.hide_board(this.scrollableGroups[name].names[index])
         this.show_board(this.scrollableGroups[name].names[index + step])
         this.scrollableGroups[name].index = index + step
-        return true
+        return {'type': 'board', 'name': this.scrollableGroups[name].names[index + step]}
       }
     }else{
       return false
     }
   }
-
-
 }
 
 export default layout
+/*
+ * 13/2/2022 00:58 GMT+1
+ *
+ * I just found out that there is another project
+ * called Peeroid, that attempted to do what
+ * I'm trying to do here: https://peeriodproject.github.io/
+ * as far as I can tell
+ * the project has been dead scince 2014
+ * the last activity is an issue opend in 2015
+ * I googled "peeriod" before I named my project
+ * and I found nothing but now out of criousity
+ * googled it again and there it is
+ * ///////
+ * turns out the name is Peeriod not Peeroid
+ * but nonetheless it seems that the work is interesting
+ * I may take a look later.
+ */

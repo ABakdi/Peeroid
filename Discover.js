@@ -186,7 +186,7 @@ class Discover{
     })
 
   }
-  getfoundPeerByName(name){
+  getFoundPeerByName(name){
     return this.echoList.find((peer)=> peer.name == name)
   }
   

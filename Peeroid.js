@@ -10,8 +10,7 @@ import {WebSocketServer} from 'ws'
 const {terminal: term} = terminal;
 const name = process.argv[2],
       port = Number(process.argv[3]),
-      search = process.argv[4],
-      sockPort = process.argv[5]
+      sockPort = process.argv[4]
 
 
 const peer = new Peer(name, [6562, 6563])
@@ -36,16 +35,16 @@ server.on('connection', (client) =>{
     peeroidClient.on('message', message =>{
       // convert message to json
       let msg = JSON.parse(message.toString())
-      // console.log(msg)
+      console.log(msg)
       // find out what command is being
       // given and act accordingly
       switch(msg.command){
         case 'connect':
-          if(msg.param.id)
-            peerIDs = msg.param.id
-          if(msg.param.name){
-            msg.param.name.forEach((name)=>{
-              let id = _discovery.getFoundPeerByName.id
+          if(msg.params.id)
+            peerIDs = msg.params.id
+          if(msg.params.name){
+            msg.params.name.forEach((name)=>{
+              let id = _discovery.getFoundPeerByName(name).id
               if(id)
                 peerIDs.push(id)
             })
@@ -61,10 +60,10 @@ server.on('connection', (client) =>{
           break
 
         case 'accept':
-          if(msg.param.id)
-            peerIDs = msg.param.id
-          if(msg.param.name){
-            msg.param.name.forEach((name)=>{
+          if(msg.params.id)
+            peerIDs = msg.params.id
+          if(msg.params.name){
+            msg.params.name.forEach((name)=>{
               let id = _requests.getRemoteRequestByName(name).id
               if(id)
                 peerIDs.push(id)
@@ -78,19 +77,19 @@ server.on('connection', (client) =>{
           break
 
         case 'send':
-          if(msg.param.id)
-            peerIDs = msg.param.id
-          if(msg.param.name){
-            msg.param.name.forEach((name)=>{
+          if(msg.params.id)
+            peerIDs = msg.params.id
+          if(msg.params.name){
+            msg.params.name.forEach((name)=>{
               let id = _linker.Peers.getPeersByName(name).id
               if(id)
                 peerIDs.push(id)
             })
           }
           let payload = {
-            'payload': msg.param.input
+            'payload': msg.input
           }
-          switch(msg.param.protocol){
+          switch(msg.params.protocol){
             case 'tcp':
               peerIDs.forEach((id)=>{
                 _linker.tcpSend(id, '#echo', payload)
@@ -107,7 +106,7 @@ server.on('connection', (client) =>{
               })
               break
           }
-          peerIDs = null
+          peerIDs = []
           break
 
         case 'get-requests':
@@ -221,6 +220,7 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
   // the date in case of a file or someting
   // send to peeriod-clients
   // if one is connected
+  console.log(info, data)
   if(data.header == '__File'){
     let fileName = data.name
     _files_handler.newChunk(fileName, data.chunk)
@@ -232,6 +232,7 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
 _eventBus.addEventListener('tcp-data', (info, data)=>{
   // send to peeriod-clients
   // if one is connected
+  console.log(info, data)
   if(info.header == '__File'){
     _files_handler.newChunk(info.id, data.fileName, data.chunk)
   }else{
@@ -239,6 +240,9 @@ _eventBus.addEventListener('tcp-data', (info, data)=>{
   }
 })
 
+_eventBus.addEventListener('tcp-data-sent', (id, data)=>{
+  check_and_send('tcp-data-sent', id, data)
+})
 // receiving data
 _eventBus.addEventListener('begin-incoming-file', (id, fileName, chunk)=>{
   _files_handler.newFile(id, fileName, chunk)
