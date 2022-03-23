@@ -46,6 +46,16 @@ class Peeroid_client{
           break
         case 'tcp-data-sent':
           this.eventBus.emit('tcp-data-sent', msg.info, msg.data)
+          break
+        case 'transfer-begins':
+          this.eventBus.emit('transfer-begins', msg.info.id, msg.info.fileName, msg.info.fileSize, msg.info.direction)
+          break
+        case 'in-transfer':
+          this.eventBus.emit('in-transfer', msg.info.id, msg.info.fileName, msg.info.fileSize, msg.info.transBytes, msg.info.direction)
+          break
+        case 'transfer-complete':
+          this.eventBus.emit('transfer-complete', msg.info.id, msg.info.fileName, msg.info.direction)
+          break
       }
     })
   }

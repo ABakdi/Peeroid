@@ -172,13 +172,15 @@ class Linker{
         'stamp': stamp
       }
     }
+    let sent_notify = msg.header != "__File"
     msg = JSON.stringify(msg)
     // add ending directive to msg
     // to prevent pecket sticking
     msg = msg.concat('/end*msg/')
 
     peer.tcpSocket.write(msg)
-    this.eventBus.Emit('tcp-data-sent', id, json)
+    if(sent_notify)
+      this.eventBus.Emit('tcp-data-sent', id, json)
   }
 
   udpSend(id, stamp, json, header = "__Data"){

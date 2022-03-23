@@ -359,36 +359,38 @@ class layout{
     if(this.boards[boardName].progressBars[barName])
       throw new Error(`progress bar '${barName}' already exists`)
 
-    let width = this.boards[name].ref.x
-    let pBarIndex = this.boards[name].pBarIndex
+    let width = this.boards[boardName].ref.textBuffer.dstClipRect.width
+    let pBarIndex = this.boards[boardName].pBarIndex
+    let x = this.boards[boardName].ref.textBuffer.dstClipRect.xmax + 1
+    let y = this.boards[boardName].ref.textBuffer.dstClipRect.ymin + 2 + pBarIndex
+    term.moveTo(x, y)
+    term(barName)
 
     let progressBar = term.progressBar({
-      x: this.boards[boardName].ref.x + width,
-      y: pBarIndex,
-      width: width/2,
-      'title': title,
-      eta: true,
+      document: this.document,
+      x: x,
+      y: y+1,
+      width: width,
+      title: title,
       percent:true,
     })
 
-    if(pBarIndex > this.boards[name].ref.hidden)
-      progressBar.hide()
+    this.boards[boardName].pBarIndex = pBarIndex + 2
 
-    pBarIndex = pBarIndex + 1
-
-    if(this.boards[name].hidden)
-      progressBar.hide()
     this.boards[boardName].progressBars[barName] = {
       'ref': progressBar,
-      'progress': 0
+      'progress': 0,
+      'x': x,
+      'y': y,
+      'width': width
     }
   }
 
   update_progressBar(boardName, barName, progress){
-    if(!this.boards[bordName])
+    if(!this.boards[boardName])
       throw new Error(`no such board '${boardName}'`)
 
-    if(!this.boards[bordName].progressBars[barName])
+    if(!this.boards[boardName].progressBars[barName])
       throw new Error(`no such progress bar '${barName}' for board '${boardName}'`)
 
     if(progress<1 && progress>0){
@@ -397,28 +399,24 @@ class layout{
     }else if(progress >= 1){
       this.boards[boardName].progressBars[barName].ref.update(1)
 
+      let x = this.boards[boardName].progressBars[barName].x
+      let y = this.boards[boardName].progressBars[barName].y
+      let width = this.boards[boardName].progressBars[barName].width
+
       // when progress bar reaches 100%
       // wait 3 seconds than delete it
       // and shift all progress bars under it
       // on step up (y axis)
       setTimeout(()=>{
-        // let x = this.boards[boardName].progressBars[barName]
-        let y = this.boards[boardName].progressBars[barName].y
-        let pBarIndex = this.boards[boardName].progressBars.pBarIndex
-
+        term.moveTo(x, y)
+        term(' '.repeat(width))
+        term.moveTo(x, y+1)
+        term(' '.repeat(width))
+        this.document.redraw()
         delete this.boards[boardName].progressBars[barName]
-
-        if(y == this.boards[boardName].progressBars.pBarIndex){
-          pBarIndex = pBarIndex - 1
-        }else{
-          this.boards[this.boards].progressBars.forEach((name, val)=>{
-            if(val.ref.y > y){
-              val.ref.y = val.ref.y - 1
-            }
-          })
-        }
       }, 3000)
     }
+
   }
 
   scroll_progress_bars(boardName, step = 1){

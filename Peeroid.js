@@ -102,7 +102,11 @@ server.on('connection', (client) =>{
               break
             case 'file':
               peerIDs.forEach((id)=>{
-                _files_handler.readFile(id, payload)
+                try{
+                  _files_handler.readFile(id, msg.input)
+                }catch(e){
+                  console.log(e.message)
+                }
               })
               break
           }
@@ -157,8 +161,8 @@ function check_and_send(event, info, data){
       'info': info,
       'data': data
     }
+    console.log(msg)
     msg = JSON.stringify(msg)
-    // console.log(msg)
     peeroidClient.send(msg)
   }
 }
@@ -220,7 +224,6 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
   // the date in case of a file or someting
   // send to peeriod-clients
   // if one is connected
-  console.log(info, data)
   if(data.header == '__File'){
     let fileName = data.name
     _files_handler.newChunk(fileName, data.chunk)
@@ -232,9 +235,8 @@ _eventBus.addEventListener('udp-data', (info, data)=>{
 _eventBus.addEventListener('tcp-data', (info, data)=>{
   // send to peeriod-clients
   // if one is connected
-  console.log(info, data)
   if(info.header == '__File'){
-    _files_handler.newChunk(info.id, data.fileName, data.chunk)
+    _files_handler.newChunk(info.id, data.fileName, data.fileSize, data.chunk)
   }else{
     check_and_send('tcp-data', info, data)
   }
@@ -244,14 +246,14 @@ _eventBus.addEventListener('tcp-data-sent', (id, data)=>{
   check_and_send('tcp-data-sent', id, data)
 })
 // receiving data
-_eventBus.addEventListener('begin-incoming-file', (id, fileName, chunk)=>{
-  _files_handler.newFile(id, fileName, chunk)
-  check_and_send('transfer-begins', {'id': id, 'fileName': fileName, 'direction': 'incoming'}, null)
+_eventBus.addEventListener('begin-incoming-file', (id, fileName, fileSize, chunk)=>{
+  _files_handler.newFile(id, fileName, fileSize, chunk)
+  check_and_send('transfer-begins', {'id': id, 'fileName': fileName, 'fileSize': fileSize, 'direction': 'incoming'}, null)
 })
 
 // recieving data
-_eventBus.addEventListener('incoming-file-chunk', (id, fileName)=>{
-    check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'direction': 'incoming'}, null)
+_eventBus.addEventListener('incoming-file-chunk', (id, fileName, fileSize, recivedBytes)=>{
+  check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'fileSize': fileSize, 'transBytes': recivedBytes, 'direction': 'incoming'}, null)
 })
 
 // recieving data
@@ -260,15 +262,15 @@ _eventBus.addEventListener('end-incoming-file', (id, fileName)=>{
 })
 
 // sending file
-_eventBus.addEventListener('begin-outgoing-file', (id, fileName)=>{
-  check_and_send('transfer-begins', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
+_eventBus.addEventListener('begin-outgoing-file', (id, fileName, fileSize)=>{
+  check_and_send('transfer-begins', {'id': id, 'fileName': fileName, 'fileSize': fileSize, 'direction': 'outgoing'}, null)
 })
 
 // sending data
-_eventBus.addEventListener('outgoing-file-chunk', (id, fileName, chunk)=>{
-  check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'direction': 'outgoing'}, null)
+_eventBus.addEventListener('outgoing-file-chunk', (id, fileName, fileSize, chunk, sentBytes)=>{
+  check_and_send('in-transfer', {'id': id, 'fileName': fileName, 'fileSize': fileSize, 'transBytes': sentBytes, 'direction': 'outgoing'}, null)
   fileName = fileName.split('/').at(-1)
-  _linker.tcpSend(id, '#echo', {'fileName': fileName, 'chunk': chunk}, '__File')
+  _linker.tcpSend(id, '#echo', {'fileName': fileName, 'fileSize': fileSize, 'chunk': chunk}, '__File')
 })
 
 // sending data

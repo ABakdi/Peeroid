@@ -38,7 +38,7 @@ class FilesHandler{
     })
   }
 
-  newChunk(id, fileName, chunk){
+  newChunk(id, fileName, fileSize, chunk){
     let file = this.getWriteFile(id, fileName)
     if(file){
       // check end of file
@@ -47,16 +47,17 @@ class FilesHandler{
         this.eventBus.Emit('end-incoming-file', id, fileName)
       }else{
         // write chunk to file
-        this.eventBus.Emit('incoming-file-chunk', id, fileName)
         chunk = decodeBase64(chunk)
         file.stream.write(chunk)
+        file.receivedBytes += Buffer.byteLength(chunk)
+        this.eventBus.Emit('incoming-file-chunk', id, fileName, fileSize,file.receivedBytes)
       }
     }else{
-      this.eventBus.Emit('begin-incoming-file', id, fileName, chunk)
+      this.eventBus.Emit('begin-incoming-file', id, fileName, fileSize, chunk)
     }
   }
 
-  newFile(id, fileName, chunk){
+  newFile(id, fileName, fileSize, chunk){
     let stream = fs.createWriteStream(`${this.dir}/${fileName}`, 'binary')
     chunk = decodeBase64(chunk)
     stream.write(chunk)
@@ -64,29 +65,39 @@ class FilesHandler{
         'id': id,
         'fileName': fileName,
         'stream': stream,
+        'fileSize': fileSize,
+        'receivedBytes': Buffer.byteLength(chunk)
       })
   }
 
   readFile(id, fileName){
+    let file = this.getReadFile(id, fileName)
+    if(file)
+      throw new Error('file in use')
     let stream = fs.createReadStream(`${fileName}`)
+    let fileSize = fs.statSync(`${fileName}`).size
 
     this.readFileStreams.push({
       'id': id,
       'fileName': fileName,
       'stream': stream,
+      'size': fileSize,
+      'sentBytes': 0
     })
 
     stream.on('open', ()=>{
-      this.eventBus.Emit('begin-outgoing-file', id, fileName)
+      this.eventBus.Emit('begin-outgoing-file', id, fileName, fileSize)
     })
 
     stream.on('data', (chunk)=>{
+      let file = this.getReadFile(id, fileName)
+      file.sentBytes += Buffer.byteLength(chunk)
       chunk = encodeBase64(chunk)
-      this.eventBus.Emit('outgoing-file-chunk', id, fileName, chunk)
+      this.eventBus.Emit('outgoing-file-chunk', id, fileName, fileSize, chunk, file.sentBytes)
     })
 
     stream.on('end', ()=>{
-      this.eventBus.Emit('end-outgoing-file', id, fileName)
+      this.eventBus.Emit('end-outgoing-file', id, fileName, fileSize)
       stream.close()
       this.removeReadFile(id, fileName)
     })
