@@ -1,3 +1,8 @@
-# udp-discovery
-this module is developed for file_share it can be used to search for other clients on the same network using udp for the time being the port must be fixed after finding clients there are functions in this labrary that gives you the ability to establish a tcp connection as well as sending and reciving data with tcp and udp
-
+# Peeroid:
+peeroid is peee to peer comunication platform, basically it is **Torrent On Steroids**
+it allows devices to connect and exchange files and messages.
+peeroid runs as a background process in your system, you can interact with it in terminal using the Peeroid CLI which comes with peeroid out of the box
+or you can use a client with GUI, chack out **Shpeeroid** the offecial peeroid client.
+## Client API:
+peeroid offers a client socket which you can connect to and send command and recieve updates from peeroid, using the peeroid client api
+you interract with peeroid programatically in order to automate and manage data exchange with other peers.
