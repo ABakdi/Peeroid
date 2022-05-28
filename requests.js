@@ -21,6 +21,10 @@ class Requests{
     return this.remoteRequests
   }
 
+  get Req(){
+    return this.requests
+  }
+
   getRemoteRequestByName(name){
     return this.remoteRequests.find((req)=> req.name == name)
   }
@@ -68,6 +72,9 @@ class Requests{
   }
 
   resolveRequest(id, res){
+    if(!res in ['accepted', 'refused'])
+      throw new Error('request must be resolved with accepted/refused')
+
     const req = this.#getRequest(id)
     if(!req)
       throw new Error('no such request')
@@ -77,6 +84,9 @@ class Requests{
   }
 
   resolveRmoteRequest(id, res){
+    if(!res in ['accepted', 'refused'])
+      throw new Error('request must be resolved with accepted/refused')
+
     const req = this.#getRemoteRequest(id)
     if(!req)
       throw new Error('no such request')

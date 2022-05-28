@@ -15,7 +15,12 @@ class Linker{
   }
 
   get peers(){
-    return this.Peers.peers
+    return this.Peers.peers.map((p)=>{
+      return {
+        'id': p.id,
+        'name': p.name
+      }
+    })
   }
 
   set _eventBus(bus){
@@ -213,7 +218,7 @@ class Linker{
     if(!peer)
       throw new Error('no such peer')
 
-    peer.ref.destroy()
+    peer.tcpSocket.destroy()
     this.Peers.removePeerById(id)
   }
 }

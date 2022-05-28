@@ -54,7 +54,24 @@ server.on('connection', (client) =>{
             _linker.requestConnection(id, "#echo")
           })
           peerIDs = []
-          break
+          break;
+
+        case 'disconnect':
+          if(msg.params.id)
+            peerIDs = msg.params.id
+          if(msg.params.name){
+            msg.params.name.forEach((name)=>{
+              let id = _linker.Peers.getPeersByName(name).id
+              if(id)
+                peerIDs.push(id)
+            })
+          }
+          peerIDs.forEach((id)=>{
+            _linker.Kill(id)
+          })
+          peerIDs = []
+          break;
+
         case 'search':
           _discovery.SearchLocalNetwork([6562, 6563])
           break
@@ -111,16 +128,17 @@ server.on('connection', (client) =>{
               break
           }
           peerIDs = []
-          break
+          break;
 
         case 'get-requests':
-          let req = _requests.remoteReq
+          let req = _requests.remoteReq.map((r)=>({...r, type: 'incoming'})).concat(
+            _requests.Req.map((r)=>({...r, type: 'outgoing'})))
           check_and_send('requests-list', {'requests': req}, null)
           break
 
         case 'get-connections':
           let peers = _linker.peers
-          check_and_send('peers-list', {'peers': peers}, null)
+          check_and_send('connections-list', {'connections': peers}, null)
           break
 
       }

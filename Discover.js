@@ -38,6 +38,15 @@ class Discover{
 
   }
 
+  get foundPeer(){
+    return this.echoList.map((peer)=>{
+      return {
+        id: peer.id,
+        name: peer.name
+      }
+    })
+  }
+
   set _eventBus(bus){
     if(bus instanceof eventBus){
       this.eventBus = bus
