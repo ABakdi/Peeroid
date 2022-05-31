@@ -135,6 +135,9 @@ class keyStore{
     }
   }
   //returns publicKey as base64 string
+  //FIXME: severe security flaw public and private key are the same
+  // please fix this
+  // THIS BUG ALONE CAN UNDERMINE THE WHOLE PROJECT
   generateAsymKey(ID, stamp){
     const key = generateAsymmetricKey()
     const publicKey = encodeBase64(key[0])

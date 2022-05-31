@@ -26,6 +26,7 @@ class Linker{
   set _eventBus(bus){
     if(bus instanceof eventBus){
       this.eventBus = bus
+      // tcp-client connection-request can be deleted but I'm scared to do it
       this.eventBus._addEvents(['tcp-data', 'tcp-end',
                                 'tcp-error','tcp-connected',
                                 'tcp-client','connection-request',

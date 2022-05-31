@@ -12,6 +12,9 @@ class FilesHandler{
                               'end-incoming-file', 'begin-outgoing-file',
                               'outgoing-file-chunk', 'end-outgoing-file'])
     this.dir = "./dwn"
+    // update thresh hold (5% of file size)
+    // to avoid fludding user with events
+    this.ut = 0.05
   }
 
   getWriteFile(id, fileName){
@@ -50,7 +53,11 @@ class FilesHandler{
         chunk = decodeBase64(chunk)
         file.stream.write(chunk)
         file.receivedBytes += Buffer.byteLength(chunk)
-        this.eventBus.Emit('incoming-file-chunk', id, fileName, fileSize,file.receivedBytes)
+        // emit event when threshold is reached
+        //                     [the oldest question in the universe,
+        // do I calculate it every time, do I sotore it in a variabl]
+        if(file.receivedBytes % file.fileSize*this.ut > file.fileSize*this.ut)
+          this.eventBus.Emit('incoming-file-chunk', id, fileName, fileSize,file.receivedBytes)
       }
     }else{
       this.eventBus.Emit('begin-incoming-file', id, fileName, fileSize, chunk)
