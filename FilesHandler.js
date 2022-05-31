@@ -100,7 +100,8 @@ class FilesHandler{
       let file = this.getReadFile(id, fileName)
       file.sentBytes += Buffer.byteLength(chunk)
       chunk = encodeBase64(chunk)
-      this.eventBus.Emit('outgoing-file-chunk', id, fileName, fileSize, chunk, file.sentBytes)
+      if(file.receivedBytes % file.fileSize*this.ut > file.fileSize*this.ut)
+        this.eventBus.Emit('outgoing-file-chunk', id, fileName, fileSize, chunk, file.sentBytes)
     })
 
     stream.on('end', ()=>{
