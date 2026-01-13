@@ -49,6 +49,18 @@ export class PeeroidNode extends EventEmitter {
     return this;
   }
 
+  private registerProtocols(): void {
+    if (!this.libp2p) return;
+
+    for (const handler of this.protocols.values()) {
+      // Correct: libp2p.handle() expects two arguments: stream and connection
+      this.libp2p.handle(handler.protocolId, (stream, connection) =>
+        handler.handleStream(stream, connection)
+      );
+    }
+  }
+
+
   // Lifecycle methods
 
   async start(): Promise<void> {
@@ -98,16 +110,6 @@ export class PeeroidNode extends EventEmitter {
     }
   }
 
-  private registerProtocols(): void {
-    if (!this.libp2p) return;
-
-    for (const handler of this.protocols.values()) {
-      // Correct: libp2p.handle() expects two arguments: stream and connection
-      this.libp2p.handle(handler.protocolId, (stream, connection) =>
-        handler.handleStream(stream, connection)
-      );
-    }
-  }
 
   private setupEventListeners(): void {
     if (!this.libp2p) return;
