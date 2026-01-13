@@ -5,39 +5,25 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./interfaces": {
-      "import": "./dist/interfaces/index.js",
-      "types": "./dist/interfaces/index.d.ts"
-    }
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@chainsafe/libp2p-noise": "^17.0.0",
     "@chainsafe/libp2p-yamux": "^8.0.1",
-    "@libp2p/circuit-relay-v2": "^4.1.2",
     "@libp2p/interface": "^3.1.0",
-    "@libp2p/interfaces": "^3.3.2",
-    "@libp2p/mplex": "^12.0.10",
-    "@libp2p/peer-id": "^3.0.0",
-    "@libp2p/webrtc": "^6.0.10",
+    "@libp2p/peer-id": "^4.2.4",
     "@libp2p/websockets": "^10.1.2",
     "@multiformats/multiaddr": "^13.0.1",
     "libp2p": "^3.1.2"
   },
   "devDependencies": {
     "@types/node": "^25.0.6",
-    "@vitest/ui": "^1.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "typescript": "^5.0.0"
   }
 }

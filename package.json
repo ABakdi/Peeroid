@@ -6,15 +6,17 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
-    "test": "npm run test --workspaces",
-    "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist"
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev",
+    "test": "pnpm -r run test",
+    "clean": "pnpm -r exec rm -rf dist && rm -rf node_modules packages/*/node_modules",
+    "chat": "pnpm --filter @peeroid/playground run chat"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "packageManager": "pnpm@10.22.0"
 }
