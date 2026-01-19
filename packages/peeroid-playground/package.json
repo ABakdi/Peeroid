@@ -1,14 +1,11 @@
 {
   "name": "@peeroid/playground",
   "version": "0.1.0",
-  "type": "module",
-  "bin": {
-    "peeroid-chat": "./dist/mini-chat.js"
-  },
+  "main": "./dist/mini-chat.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "chat": "node dist/mini-chat.js",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@libp2p/interface": "^3.1.0",

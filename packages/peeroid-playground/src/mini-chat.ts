@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { PeeroidNode } from '@peeroid/core';
 import readline from 'readline';
-
 // 1. Create a node - that's it
 const node = new PeeroidNode({
   listenAddresses: ['/ip4/127.0.0.1/tcp/0/ws']
@@ -90,7 +89,7 @@ let activeStream: any = null;
 // 7. Start everything
 async function start() {
   await node.start();
-  console.log(`🚀 Peer started: ${node.getPeerId()}`);
+  console.log(`🚀 Peer started: ${node.getPeerId()}, ${node}`);
   console.log(`📝 Type '/connect <address>' to connect to another peer`);
   console.log(`📝 Just type a message to send to connected peer\n`);
 

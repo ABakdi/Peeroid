@@ -2,21 +2,42 @@
   "name": "peeroid",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
-  "scripts": {
-    "build": "pnpm -r run build",
-    "dev": "pnpm -r run dev",
-    "test": "pnpm -r run test",
-    "clean": "pnpm -r exec rm -rf dist && rm -rf node_modules packages/*/node_modules",
-    "chat": "pnpm --filter @peeroid/playground run chat"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abakdi/peeroid.git"
   },
-  "devDependencies": {
-    "typescript": "^5.9.3"
+  "publishconfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "clean": "pnpm -r exec rm -rf dist && rm -rf node_modules packages/*/node_modules packages/*/tsconfig.tsbuildinfo",
+    "build": "turbo run build",
+    "build:clean": "turbo run clean:build",
+    "dev": "turbo run dev",
+    "lint-format": "turbo run --parallel lint format ",
+    "lint-format:fix": "turbo run --parallel lint:fix format:fix",
+    "lint": "eslint . --ext .js,.ts",
+    "lint:fix": "eslint . --ext .js,.ts --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "turbo run --parallel test",
+    "typecheck": "turbo run --parallel typecheck",
+    "prepare": "husky",
+    "chat": "node ./packages/peeroid-playground/dist/mini-chat.js"
+  },
+  "devdependencies": {
+    "@types/node": "^25.0.9",
+    "eslint": "^9.39.2",
+    "husky": "^9.1.7",
+    "prettier": "^3.8.0",
+    "turbo": "^2.7.5",
+    "typescript": "^4.9.5"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.11.1",
+    "pnpm": ">=10.28.0"
   },
-  "packageManager": "pnpm@10.22.0"
+  "packageManager": "pnpm@10.28.0"
 }

@@ -1,7 +1,2 @@
 packages:
   - packages/*
-  - '!**/node_modules'
-
-onlyBuiltDependencies:
-  - esbuild
-  - node-datachannel

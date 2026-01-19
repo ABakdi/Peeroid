@@ -1,6 +1,6 @@
 import type { Libp2p, Connection, Stream } from '@libp2p/interface';
 import { EventEmitter } from 'events';
-import { multiaddr } from '@multiformats/multiaddr';
+//import { multiaddr } from '@multiformats/multiaddr';
 import { PeeroidNodeConfig } from './config/types';
 import {
   IPeeroidStorage,
@@ -162,6 +162,7 @@ export class PeeroidNode extends EventEmitter {
     }
 
     try {
+      const { multiaddr } = await import("@multiformats/multiaddr")
       // Convert string to Multiaddr
       const addr = multiaddr(address);
       const connection = await this.libp2p.dial(addr);
