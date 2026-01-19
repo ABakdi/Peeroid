@@ -9,7 +9,8 @@ DEFAULT_IGNORE=(
     'node_modules/' 'dist/' 'build/' '\.git/' '\.idea/' '__pycache__/'
     '[Rr][Ee][Aa][Dd][Mm][Ee].*' '.*-lock\.yaml$' 'package-lock.json'
     'yarn.lock' '\.png$' '\.jpg$' '\.jpeg$' '\.gif$' '\.zip$'
-    '\.tar\.gz$' '\.pdf$' '\.exe$'
+    '\.tar\.gz$' '\.pdf$' '\.exe$' '\.turbo/' '\.husky/' '\.obsidian/'
+    
 )
 
 while getopts "i:s:" opt; do
